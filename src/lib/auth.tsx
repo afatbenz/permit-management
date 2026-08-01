@@ -1,47 +1,43 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import type { Session, User } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { createContext, useContext, type ReactNode } from 'react';
 
-type AuthCtx = {
-  session: Session | null;
-  user: User | null;
-  loading: boolean;
-  signOut: () => Promise<void>;
+type MockUser = {
+  id: string;
+  email: string;
+  user_metadata: { full_name: string };
 };
 
-const AuthContext = createContext<AuthCtx | undefined>(undefined);
+type AuthCtx = {
+  session: { user: MockUser } | null;
+  user: MockUser;
+  loading: boolean;
+  signOut: () => void;
+};
+
+const MOCK_USER: MockUser = {
+  id: 'mock-user-001',
+  email: 'admin@example.com',
+  user_metadata: { full_name: 'Admin User' },
+};
+
+const authValue: AuthCtx = {
+  session: { user: MOCK_USER },
+  user: MOCK_USER,
+  loading: false,
+  signOut: () => {
+    // no-op — auth is bypassed
+  },
+};
+
+const AuthContext = createContext<AuthCtx>(authValue);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
-
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
-      setSession(sess);
-    });
-
-    return () => sub.subscription.unsubscribe();
-  }, []);
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    setSession(null);
-  };
-
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading, signOut }}>
+    <AuthContext.Provider value={authValue}>
       {children}
     </AuthContext.Provider>
   );
 }
 
 export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  return ctx;
+  return useContext(AuthContext);
 }

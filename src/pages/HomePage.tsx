@@ -1,37 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { FileText, Clock, CheckCircle2, XCircle, TrendingUp, Plus, ArrowRight } from 'lucide-react';
-import { supabase, type Permit } from '@/lib/supabase';
+import { getPermits, type Permit } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from '@/lib/router';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { StatusBadge, Spinner, EmptyState } from '@/components/ui';
+import { StatusBadge, EmptyState } from '@/components/ui';
 
 export function HomePage() {
   const { user } = useAuth();
   const { navigate } = useRouter();
-  const [permits, setPermits] = useState<Permit[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    supabase
-      .from('permits')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(5)
-      .then(({ data }) => {
-        setPermits((data as Permit[]) ?? []);
-        setLoading(false);
-      });
-  }, []);
+  const permits: Permit[] = getPermits().slice(0, 5);
 
   const stats = {
-    total: permits.length,
-    pending: permits.filter((p) => p.status === 'pending').length,
-    approved: permits.filter((p) => p.status === 'approved').length,
-    rejected: permits.filter((p) => p.status === 'rejected').length,
+    total: getPermits().length,
+    pending: getPermits().filter((p) => p.status === 'pending').length,
+    approved: getPermits().filter((p) => p.status === 'approved').length,
+    rejected: getPermits().filter((p) => p.status === 'rejected').length,
   };
 
-  const firstName = (user?.user_metadata?.full_name as string | undefined)?.split(' ')[0] ?? 'there';
+  const firstName = user.user_metadata.full_name.split(' ')[0];
 
   const STAT_CARDS = [
     { label: 'Total Permits', value: stats.total, icon: <FileText className="h-5 w-5" />, tint: 'text-brand-600 bg-brand-50 dark:bg-brand-500/10 dark:text-brand-400' },
@@ -44,8 +31,7 @@ export function HomePage() {
     <DashboardLayout active="Home">
       <div className="space-y-6">
         {/* Hero greeting */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 p-6 text-white sm:p-8">
-          <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 90% 10%, white 0%, transparent 50%)' }} />
+        <div className="relative overflow-hidden rounded-2xl bg-brand-700 p-6 text-white sm:p-8">
           <div className="relative flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
               <p className="text-sm text-brand-100">Welcome back,</p>
@@ -81,11 +67,7 @@ export function HomePage() {
             </button>
           </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center py-16 text-brand-500">
-              <Spinner className="h-6 w-6" />
-            </div>
-          ) : permits.length === 0 ? (
+          {permits.length === 0 ? (
             <EmptyState
               icon={<FileText className="h-6 w-6" />}
               title="No permits yet"

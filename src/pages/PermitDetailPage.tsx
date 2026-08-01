@@ -1,49 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ArrowLeft, Building2, MapPin, User, Calendar, FileText, CheckCircle2, XCircle, Clock, Trash2, ArrowRight } from 'lucide-react';
-import { supabase, type Permit } from '@/lib/supabase';
+import { getPermit, deletePermit, type Permit } from '@/lib/supabase';
 import { useRouter } from '@/lib/router';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { StatusBadge, Spinner, EmptyState } from '@/components/ui';
+import { StatusBadge, EmptyState } from '@/components/ui';
 
 export function PermitDetailPage({ id }: { id: string }) {
   const { navigate } = useRouter();
-  const [permit, setPermit] = useState<Permit | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
+  const permit: Permit | undefined = getPermit(id);
 
-  useEffect(() => {
-    supabase
-      .from('permits')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (error || !data) setNotFound(true);
-        else setPermit(data as Permit);
-        setLoading(false);
-      });
-  }, [id]);
-
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!confirm('Are you sure you want to delete this permit? This cannot be undone.')) return;
-    await supabase.from('permits').delete().eq('id', id);
+    deletePermit(id);
     navigate('/dashboard/permits');
   };
 
   const formatDateTime = (iso: string) =>
     new Date(iso).toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' });
 
-  if (loading) {
-    return (
-      <DashboardLayout active="Permit Management">
-        <div className="flex items-center justify-center py-20 text-brand-500">
-          <Spinner className="h-6 w-6" />
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  if (notFound || !permit) {
+  if (!permit) {
     return (
       <DashboardLayout active="Permit Management">
         <div className="mx-auto max-w-3xl">

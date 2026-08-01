@@ -1,7 +1,6 @@
 import { type ReactNode, useState } from 'react';
 import { LayoutDashboard, FileText, LogOut, Menu, Moon, Sun, X, Bell, Search } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
-import { useAuth } from '@/lib/auth';
 import { useRouter } from '@/lib/router';
 import { Logo } from '@/components/ui';
 
@@ -14,11 +13,10 @@ const NAV: NavItem[] = [
 
 export function DashboardLayout({ children, active }: { children: ReactNode; active: string }) {
   const { theme, toggle } = useTheme();
-  const { user, signOut } = useAuth();
   const { navigate } = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const initials = (user?.email ?? 'U').slice(0, 2).toUpperCase();
+  const initials = 'AD'.toUpperCase(); // Mock initials since we bypassed auth
 
   const handleNav = (path: string) => {
     navigate(path);
@@ -55,7 +53,7 @@ export function DashboardLayout({ children, active }: { children: ReactNode; act
       </nav>
       <div className="border-t border-gray-200 p-3 dark:border-slate-800">
         <button
-          onClick={async () => { await signOut(); navigate('/login'); }}
+          onClick={() => navigate('/login')}
           className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-rose-50 hover:text-rose-600 dark:text-slate-400 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
         >
           <LogOut className="h-5 w-5 text-gray-400 dark:text-slate-500" />
@@ -109,11 +107,11 @@ export function DashboardLayout({ children, active }: { children: ReactNode; act
               <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900" />
             </button>
             <div className="ml-1 flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-xs font-bold text-white">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white">
                 {initials}
               </div>
               <div className="hidden leading-tight sm:block">
-                <p className="text-xs font-semibold text-gray-900 dark:text-slate-100">{user?.email}</p>
+                <p className="text-xs font-semibold text-gray-900 dark:text-slate-100">admin@example.com</p>
                 <p className="text-[11px] text-gray-400 dark:text-slate-500">Administrator</p>
               </div>
             </div>

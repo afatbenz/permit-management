@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowLeft, Save, Building2 } from 'lucide-react';
-import { supabase, type PermitInput } from '@/lib/supabase';
+import { addPermit, type PermitInput } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from '@/lib/router';
 import { DashboardLayout } from '@/components/DashboardLayout';
@@ -38,12 +38,12 @@ export function NewPermitPage() {
     province: '',
     project: '',
   });
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   const set = (key: keyof PermitInput, value: string) => setForm((p) => ({ ...p, [key]: value }));
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -52,39 +52,14 @@ export function NewPermitPage() {
       return;
     }
 
-    setLoading(true);
+    setSubmitting(true);
 
-    // generate permit number: PMT-YYYY-XXXX (count-based)
-    const year = new Date().getFullYear();
-    const { count } = await supabase.from('permits').select('*', { count: 'exact', head: true });
-    const seq = String((count ?? 0) + 1).padStart(4, '0');
-    const permit_number = `PMT-${year}-${seq}`;
-
-    const { data, error } = await supabase
-      .from('permits')
-      .insert({
-        permit_number,
-        department: form.department,
-        contractor_name: form.contractor_name,
-        address_1: form.address_1,
-        address_2: form.address_2 || null,
-        city: form.city,
-        province: form.province,
-        project: form.project,
-        status: 'pending',
-        user_email: user?.email ?? 'unknown',
-      })
-      .select('id')
-      .single();
-
-    setLoading(false);
-
-    if (error) {
-      setError(error.message);
-      return;
-    }
-
-    navigate(`/dashboard/permits/${data.id}`);
+    // Small delay to show the spinner (feels more natural)
+    setTimeout(() => {
+      const permit = addPermit(form, user.email);
+      setSubmitting(false);
+      navigate(`/dashboard/permits/${permit.id}`);
+    }, 300);
   };
 
   return (
@@ -161,8 +136,8 @@ export function NewPermitPage() {
 
           <div className="flex items-center justify-end gap-3 border-t border-gray-200 pt-5 dark:border-slate-800">
             <button type="button" onClick={() => navigate('/dashboard/permits')} className="btn-ghost">Cancel</button>
-            <button type="submit" disabled={loading} className="btn-primary">
-              {loading ? <Spinner className="h-4 w-4" /> : <><Save className="h-4 w-4" /> Submit Permit</>}
+            <button type="submit" disabled={submitting} className="btn-primary">
+              {submitting ? <Spinner className="h-4 w-4" /> : <><Save className="h-4 w-4" /> Submit Permit</>}
             </button>
           </div>
         </form>

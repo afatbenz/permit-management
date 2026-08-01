@@ -1,30 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Plus, Search, FileText, Eye, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
-import { supabase, type Permit } from '@/lib/supabase';
+import { getPermits, type Permit } from '@/lib/supabase';
 import { useRouter } from '@/lib/router';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { StatusBadge, Spinner, EmptyState } from '@/components/ui';
+import { StatusBadge, EmptyState } from '@/components/ui';
 
 const PAGE_SIZE = 8;
 
 export function PermitManagementPage() {
   const { navigate } = useRouter();
-  const [permits, setPermits] = useState<Permit[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | Permit['status']>('all');
   const [page, setPage] = useState(1);
 
-  useEffect(() => {
-    supabase
-      .from('permits')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .then(({ data, error }) => {
-        if (!error) setPermits((data as Permit[]) ?? []);
-        setLoading(false);
-      });
-  }, []);
+  const permits = getPermits();
 
   const filtered = useMemo(() => {
     return permits.filter((p) => {
@@ -96,11 +85,7 @@ export function PermitManagementPage() {
 
         {/* Table */}
         <div className="card overflow-hidden">
-          {loading ? (
-            <div className="flex items-center justify-center py-20 text-brand-500">
-              <Spinner className="h-6 w-6" />
-            </div>
-          ) : paged.length === 0 ? (
+          {paged.length === 0 ? (
             <EmptyState
               icon={<FileText className="h-6 w-6" />}
               title={search || statusFilter !== 'all' ? 'No matching permits' : 'No permits yet'}
@@ -134,7 +119,7 @@ export function PermitManagementPage() {
                         <td className="px-5 py-3.5 text-gray-600 dark:text-slate-300">{formatDate(p.created_at)}</td>
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-2">
-                            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-[10px] font-bold text-white">
+                            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-brand-500 text-[10px] font-bold text-white">
                               {p.user_email.slice(0, 2).toUpperCase()}
                             </div>
                             <span className="max-w-[140px] truncate text-gray-700 dark:text-slate-300">{p.user_email}</span>
@@ -165,7 +150,7 @@ export function PermitManagementPage() {
           )}
 
           {/* Pagination */}
-          {!loading && filtered.length > 0 && (
+          {filtered.length > 0 && (
             <div className="flex items-center justify-between border-t border-gray-200 px-5 py-3 dark:border-slate-800">
               <p className="text-xs text-gray-500 dark:text-slate-400">
                 Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length}
