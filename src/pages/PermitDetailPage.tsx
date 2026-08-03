@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { ArrowLeft, Building2, MapPin, User, Calendar, FileText, CheckCircle2, XCircle, Clock, Trash2, ArrowRight } from 'lucide-react';
 import { getPermit, deletePermit, type Permit } from '@/lib/supabase';
 import { useRouter } from '@/lib/router';

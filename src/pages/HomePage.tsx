@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { FileText, Clock, CheckCircle2, XCircle, TrendingUp, Plus, ArrowRight } from 'lucide-react';
 import { getPermits, type Permit } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
@@ -18,7 +17,7 @@ export function HomePage() {
     rejected: getPermits().filter((p) => p.status === 'rejected').length,
   };
 
-  const firstName = user.user_metadata.full_name.split(' ')[0];
+  const firstName = (user?.name ?? '').split(' ')[0] || 'Pengguna';
 
   const STAT_CARDS = [
     { label: 'Total Permits', value: stats.total, icon: <FileText className="h-5 w-5" />, tint: 'text-brand-600 bg-brand-50 dark:bg-brand-500/10 dark:text-brand-400' },

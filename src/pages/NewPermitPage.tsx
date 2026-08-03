@@ -56,7 +56,7 @@ export function NewPermitPage() {
 
     // Small delay to show the spinner (feels more natural)
     setTimeout(() => {
-      const permit = addPermit(form, user.email);
+      const permit = addPermit(form, user?.email ?? '');
       setSubmitting(false);
       navigate(`/dashboard/permits/${permit.id}`);
     }, 300);
