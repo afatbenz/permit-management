@@ -83,6 +83,25 @@ export type JoinOrganizationPayload = {
   phone: string;
 };
 
+// ---- User management (Org Admin) ----
+
+export type AdminUser = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  roleId: string;
+  roleCode: RoleCode | null;
+  roleName: string | null;
+  verificationStatus: string;
+  status: string;
+  createdAt: string;
+};
+
+export type ListUsersResponse = {
+  users: AdminUser[];
+};
+
 export type ResolvedRegistrationLink = {
   organization: { id: string; name: string } | null;
   subconCompanies: Array<{ id: string; name: string }>;
@@ -213,5 +232,16 @@ export const api = {
     return request<ResolvedRegistrationLink>(
       `/api/v1/auth/registration-links/${encodeURIComponent(token)}`,
     );
+  },
+
+  async listUsers(organizationId: string): Promise<ListUsersResponse> {
+    return request<ListUsersResponse>(`/api/v1/organizations/${organizationId}/users`);
+  },
+
+  async updateUserRole(organizationId: string, userId: string, roleId: string): Promise<{ message: string }> {
+    return request<{ message: string }>(`/api/v1/organizations/${organizationId}/users/${userId}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify({ roleId }),
+    });
   },
 };

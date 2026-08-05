@@ -88,7 +88,7 @@ export function LoginPage() {
             onClick={() => navigate('/register')}
             className="font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400"
           >
-            Daftar sebagai Supervisor Sub-Kontraktor
+            Daftar Sekarang
           </button>
         </p>
       </div>

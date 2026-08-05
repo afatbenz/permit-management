@@ -14,7 +14,7 @@ export default defineConfig({
     proxy: {
       // Forward API calls to the NestJS backend during dev (avoids CORS).
       '/api': {
-        target: 'http://localhost:3000',
+        target: process.env.VITE_API_TARGET || 'http://202.10.36.37:80',
         changeOrigin: true,
       },
     },
