@@ -1,15 +1,16 @@
 import { type ReactNode, useState } from 'react';
-import { LayoutDashboard, FileText, LogOut, Menu, Moon, Sun, X, Bell, Search } from 'lucide-react';
+import { LayoutDashboard, FileText, LogOut, Menu, Moon, Sun, X, Bell, Search, Users } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from '@/lib/router';
 import { Logo } from '@/components/ui';
 
-type NavItem = { label: string; icon: ReactNode; path: string; match: (segs: string[]) => boolean };
+type NavItem = { label: string; icon: ReactNode; path: string; match: (segs: string[]) => boolean; adminOnly?: boolean };
 
 const NAV: NavItem[] = [
   { label: 'Home', icon: <LayoutDashboard className="h-5 w-5" />, path: '/dashboard', match: (s) => s[0] === 'dashboard' && s.length === 1 },
   { label: 'Permit Management', icon: <FileText className="h-5 w-5" />, path: '/dashboard/permits', match: (s) => s[0] === 'dashboard' && s[1] === 'permits' },
+  { label: 'Users', icon: <Users className="h-5 w-5" />, path: '/dashboard/users', match: (s) => s[0] === 'dashboard' && s[1] === 'users', adminOnly: true },
 ];
 
 export function DashboardLayout({ children, active }: { children: ReactNode; active: string }) {
@@ -26,6 +27,8 @@ export function DashboardLayout({ children, active }: { children: ReactNode; act
     .map((p) => p[0]?.toUpperCase() ?? '')
     .join('');
   const roleName = user?.role?.name ?? '';
+  const isOrgAdmin = user?.role?.code === 'org_admin' || user?.role?.code === 'super_admin';
+  const visibleNav = NAV.filter((item) => !item.adminOnly || isOrgAdmin);
 
   const handleNav = (path: string) => {
     navigate(path);
@@ -46,7 +49,7 @@ export function DashboardLayout({ children, active }: { children: ReactNode; act
       </div>
       <nav className="mt-2 flex-1 space-y-1 px-3">
         <p className="px-3 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Menu</p>
-        {NAV.map((item) => {
+        {visibleNav.map((item) => {
           const isActive = item.label === active;
           return (
             <button

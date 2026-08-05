@@ -10,6 +10,7 @@ import { HomePage } from '@/pages/HomePage';
 import { PermitManagementPage } from '@/pages/PermitManagementPage';
 import { NewPermitPage } from '@/pages/NewPermitPage';
 import { PermitDetailPage } from '@/pages/PermitDetailPage';
+import { UsersManagementPage } from '@/pages/UsersManagementPage';
 
 function Routes() {
   const { segments } = useRoute();
@@ -60,6 +61,15 @@ function Routes() {
     return null;
   }
 
+  // Users management — admin (org_admin / super_admin) only.
+  const isAdmin = user?.role?.code === 'org_admin' || user?.role?.code === 'super_admin';
+  if (segments[0] === 'dashboard' && segments[1] === 'users') {
+    if (!isAdmin) {
+      navigate('/dashboard');
+      return null;
+    }
+    return <UsersManagementPage />;
+  }
   if (segments[0] === 'dashboard' && segments[1] === 'permits' && segments[2] === 'new') return <NewPermitPage />;
   if (segments[0] === 'dashboard' && segments[1] === 'permits' && segments[2]) return <PermitDetailPage id={segments[2]} />;
   if (segments[0] === 'dashboard' && segments[1] === 'permits') return <PermitManagementPage />;
