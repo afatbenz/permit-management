@@ -3,7 +3,7 @@ import { FileText, Clock, CheckCircle2, XCircle, TrendingUp, Plus, ArrowRight } 
 import { getPermits, type Permit } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from '@/lib/router';
-import { DashboardLayout } from '@/components/DashboardLayout';
+import DashboardLayout from '@/layouts/DashboardLayout';
 import { StatusBadge, EmptyState } from '@/components/ui';
 
 export function HomePage() {
@@ -29,7 +29,8 @@ export function HomePage() {
 
   return (
     <DashboardLayout active="Home">
-      <div className="space-y-6">
+    {/* <DashboardLayout> */}
+    <div className="space-y-6">
         {/* Hero greeting */}
         <div className="relative overflow-hidden rounded-2xl bg-brand-700 p-6 text-white sm:p-8">
           <div className="relative flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
