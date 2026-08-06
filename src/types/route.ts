@@ -6,7 +6,7 @@ export enum ENUM_ROLE_AUTH {
   SAFETY_OFFICER = 'SAFETY_OFFICER',
   ISSUER = 'ISSUER',
   EXECUTOR = 'EXECUTOR',
-  UNASSIGNED = 'UNASSIGNED'
+  UNASSIGNED = 'unassigned'
 }
 
 export type TAppRoute = {
