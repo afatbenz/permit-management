@@ -7,7 +7,7 @@ import { useClientStore } from '@/stores/Client';
 
 const API_BASE_URL = import.meta.env.VITE_API_HOST || 'http://202.10.36.37:80';
 
-interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
+interface CustomAxiosRequestConfig extends Partial<InternalAxiosRequestConfig> {
   _retry?: boolean;
 }
 
@@ -67,8 +67,10 @@ class AxiosService {
               this.failedQueue.push({ resolve, reject });
             })
               .then((token) => {
-                originalRequest.headers.Authorization = `Bearer ${token}`;
-                return this.client(originalRequest);
+                if (originalRequest.headers) {
+                  originalRequest.headers.Authorization = `Bearer ${token}`;
+                }
+                return this.client(originalRequest as InternalAxiosRequestConfig);
               })
               .catch((err) => Promise.reject(err));
           }
@@ -82,7 +84,7 @@ class AxiosService {
 
             // Guard: Jika tidak ada refresh token di memori/storage, paksa logout
             if (!refreshToken) {
-               throw new Error('Refresh token tidak tersedia');
+              throw new Error('Refresh token tidak tersedia');
             }
 
             // KIRIM REFRESH TOKEN VIA BODY JSON
@@ -98,7 +100,9 @@ class AxiosService {
             setAccessToken(newAccessToken);
             this.processQueue(null, newAccessToken);
 
-            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+            if (originalRequest.headers) {
+              originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+            }
             return this.client(originalRequest);
             
           } catch (refreshError) {

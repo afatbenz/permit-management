@@ -3,6 +3,32 @@ import { immer } from 'zustand/middleware/immer';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { axiosService } from '@/services/axiosService';
 import { ENUM_ROLE_AUTH } from '@/types/route'; 
+import type { RegisterFormInputs } from '@/schemas/auth.schema';
+
+// Mockup Company Data ( Vendor or etc... )
+export const MOCK_COMPANIES = [
+  { value: 'COMP-001', label: 'PT. Mitra Konstruksi' },
+  { value: 'COMP-002', label: 'CV. Hijau Lestari' },
+  { value: 'COMP-003', label: 'PT. Safety First Indonesia' },
+];
+
+// Fetch Companies list
+export const fetchCompanies = async () => {
+  return new Promise<{ value: string; label: string }[]>((resolve) => {
+    setTimeout(() => resolve(MOCK_COMPANIES), 500);
+  });
+};
+
+// Registration process Function
+export const registerUser = async (data: RegisterFormInputs) => {
+  console.info('[SERVICE] Mengirim data ke server:', data);
+
+  return new Promise<{ success: boolean; message: string }>((resolve, reject) => {
+    setTimeout(() => {
+      resolve({ success: true, message: 'Registrasi berhasil dilakukan' });
+    }, 1500);
+  });
+};
 
 // 1. Perbaikan Interface (Sesuai dengan payload API sebenarnya)
 interface Role {
@@ -32,7 +58,7 @@ interface User {
 }
 
 interface LoginPayload {
-  username: string;
+  email: string;
   password?: string;
 }
 

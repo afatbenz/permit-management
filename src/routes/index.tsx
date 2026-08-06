@@ -31,6 +31,7 @@ const routes: TAppRoute[] = [
     isProtected: false,
     isUnProtected: true, // Guest only, mencegah user login masuk ke sini
     component: RegisterPage,
+    layout: AuthLayout
   },
   {
     path: '/dashboard',

@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { ArrowLeft, Save, Building2 } from 'lucide-react';
 import { addPermit, type PermitInput } from '@/lib/supabase';
-import { useAuth } from '@/lib/auth';
 import { useNavigate } from 'react-router-dom';
 import { Field, SuggestionInput } from '@/components/Field';
 import { Spinner } from '@/components/ui';
+import { useClientStore } from '@/stores/Client';
 
 const DEPARTMENTS = [
   'Engineering',
@@ -25,8 +25,8 @@ const PROVINCES = [
   'Sulawesi Selatan', 'Sulawesi Utara', 'Papua', 'Maluku', 'Aceh', 'Lampung',
 ];
 
-const NewPermitPage = () => {
-  const { user } = useAuth();
+export function NewPermitPage() {
+  const user = useClientStore((state) => state.user);
   const navigate = useNavigate();
   const [form, setForm] = useState<PermitInput>({
     department: '',
@@ -53,9 +53,8 @@ const NewPermitPage = () => {
 
     setSubmitting(true);
 
-    // Small delay to show the spinner (feels more natural)
     setTimeout(() => {
-      const permit = addPermit(form, user.email);
+      const permit = addPermit(form, user?.name || user?.email || 'user');
       setSubmitting(false);
       navigate(`/dashboard/permits/${permit.id}`);
     }, 300);
