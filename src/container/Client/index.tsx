@@ -34,10 +34,11 @@ const Client: FC<ClientProps> = ({ children, isProtected, isUnProtected, roles }
   if (isUnProtected && isAuth) {
     return <Navigate to="/dashboard" replace />;
   }
-
+  console.log(!roleUser || !roles?.includes(roleUser), '<<<< CHECK ROLE')
   // 3. RBAC (Role-Based Access Control)
   if (isProtected && roles && roles.length > 0) {
     if (!roleUser || !roles.includes(roleUser)) {
+      console.log('<<<< MASUK KONDISI')
       // Jika role tidak sesuai, lempar ke dashboard atau halaman 403
       return <Navigate to="/dashboard" replace />;
     }
