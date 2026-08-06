@@ -9,7 +9,7 @@ const DashboardLayout = lazy(() => import('@/layouts/DashboardLayout'));
 // const Dashboard = lazy(() => import('@/pages/Dashboard'));
 // const Dashboard = lazy(() => import('@/pages/HomePage'));
 const Dashboard = lazy(() => import('@/pages/HomePage'))
-// const PermitManagementPage = lazy(() => import('@/pages/PermitManagementPage'));
+const PermitManagementPage = lazy(() => import('@/pages/PermitManagementPage'));
 // const NewPermitPage = lazy(() => import('@/pages/NewPermitPage'));
 // const PermitDetailPage = lazy(() => import('@/pages/PermitDetailPage'));
 // const NotFound = lazy(() => import('@/pages/NotFound'));
@@ -29,16 +29,16 @@ const routes: TAppRoute[] = [
     isProtected: true,
     component: Dashboard,
     layout: DashboardLayout, // Gunakan DashboardLayout di sini
-    roles: [ENUM_ROLE_AUTH.SUPER_ADMIN, ENUM_ROLE_AUTH.SAFETY_OFFICER, ENUM_ROLE_AUTH.ISSUER, ENUM_ROLE_AUTH.EXECUTOR]
+    roles: [ENUM_ROLE_AUTH.SUPER_ADMIN, ENUM_ROLE_AUTH.SAFETY_OFFICER, ENUM_ROLE_AUTH.ISSUER, ENUM_ROLE_AUTH.EXECUTOR, ENUM_ROLE_AUTH.UNASSIGNED]
   },
-  // {
-  //   path: '/permit',
-  //   name: 'Permit Management',
-  //   isProtected: true,
-  //   component: PermitManagementPage,
-  //   layout: DashboardLayout,
-  //   roles: [ENUM_ROLE_AUTH.SUPER_ADMIN, ENUM_ROLE_AUTH.SAFETY_OFFICER, ENUM_ROLE_AUTH.ISSUER]
-  // },
+  {
+    path: '/permit',
+    name: 'Permit Management',
+    isProtected: true,
+    component: PermitManagementPage,
+    layout: DashboardLayout,
+    roles: [ENUM_ROLE_AUTH.SUPER_ADMIN, ENUM_ROLE_AUTH.SAFETY_OFFICER, ENUM_ROLE_AUTH.ISSUER, ENUM_ROLE_AUTH.UNASSIGNED]
+  },
   // {
   //   path: '/permit/new',
   //   name: 'Create New Permit',

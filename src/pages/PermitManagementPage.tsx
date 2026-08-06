@@ -7,7 +7,7 @@ import { StatusBadge, EmptyState } from '@/components/ui';
 
 const PAGE_SIZE = 8;
 
-export function PermitManagementPage() {
+const PermitManagementPage = () => {
   const { navigate } = useRouter();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | Permit['status']>('all');
@@ -179,3 +179,5 @@ export function PermitManagementPage() {
     </DashboardLayout>
   );
 }
+
+export default PermitManagementPage;

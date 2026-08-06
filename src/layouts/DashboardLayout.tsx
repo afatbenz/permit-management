@@ -21,6 +21,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   // Ambil state autentikasi dari Zustand Store
   const { user, logout } = useClientStore();
+  console.log(user, '<< USER')
 
   // Generate inisial dari nama user (fallback ke 'AD' jika kosong)
   const initials = user?.name 
@@ -128,8 +129,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 {initials}
               </div>
               <div className="hidden leading-tight sm:block">
-                <p className="text-xs font-semibold text-gray-900 dark:text-slate-100">{user?.username || 'Guest'}</p>
-                <p className="text-[11px] text-gray-400 dark:text-slate-500">{user?.role || 'User'}</p>
+                <p className="text-xs font-semibold text-gray-900 dark:text-slate-100">{user?.name || 'Guest'}</p>
+                <p className="text-[11px] text-gray-400 dark:text-slate-500">{user?.role?.code || 'User'}</p>
               </div>
             </div>
           </div>
