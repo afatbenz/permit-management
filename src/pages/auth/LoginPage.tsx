@@ -26,7 +26,7 @@ export function LoginPage() {
       setApiError(null);
       
       // 1. Call login from Zustand Store
-      const success = await login({ username: data.email, password: data.password });
+      const success = await login({ email: data.email, password: data.password });
       
       if (success) {
         // 2. Arahkan ke Dashboard
@@ -133,7 +133,7 @@ export function LoginPage() {
             Belum punya akun Sub-Con?{' '}
             <button 
               type="button" 
-              onClick={() => navigate('/auth/register')}
+              onClick={() => navigate('/register')}
               className="font-semibold text-red-600 hover:text-red-500 transition-colors"
             >
               Daftar di sini

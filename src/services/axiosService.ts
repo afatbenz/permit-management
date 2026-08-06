@@ -102,8 +102,8 @@ class AxiosService {
 
             if (originalRequest.headers) {
               originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-              return this.client(originalRequest);
             }
+            return this.client(originalRequest);
             
           } catch (refreshError) {
             this.processQueue(refreshError, null);
