@@ -36,9 +36,17 @@ interface LoginPayload {
   password?: string;
 }
 
+export interface RegisterPayload {
+  name: string;
+  email: string;
+  password: string;
+  phone: string;
+}
+
 interface IClientState {
   isAuthenticated: boolean;
   accessToken: string | null;
+  refreshToken: string | null;
   hydrated: boolean;
   isLoading: boolean;
   error: string | null;
@@ -47,6 +55,7 @@ interface IClientState {
 
 interface IClientActions {
   login: (payload: LoginPayload) => Promise<boolean>;
+  register: (payload: RegisterPayload) => Promise<boolean>; // TAMBAHKAN INI
   logout: () => void;
   setAccessToken: (token: string | null) => void;
   clearAuth: () => void;
@@ -82,11 +91,12 @@ const dummyUser: User = {
 
 // 3. Set Initial State agar selalu login
 const initialState: IClientState = {
-  user: dummyUser,
+  user: null,
   isLoading: false,
   error: null,
-  isAuthenticated: true, // BYPASS AKTIF
+  isAuthenticated: false, // BYPASS AKTIF
   accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmYmMzMDE5YS0zMDI1LTRmZmYtOWJmOS1kNzE0NGI0ZTc3M2EiLCJvcmdhbml6YXRpb25JZCI6ImUxZjhhYmY4LTgzMWUtNGY5Yy1iZjI5LTBmMzk1NzkxN2NjOCIsInJvbGVJZCI6ImQ5MDdhOWNiLTU2NDMtNGU2NS05ZjRlLWNhOTg2ODFlZTU1MSIsInJvbGVDb2RlIjoidW5hc3NpZ25lZCIsImlhdCI6MTc4NjAyMDM5MSwiZXhwIjoxNzg2MTA2NzkxfQ.OWEvvFPaH6qAPn-x9A4fRsiIdfzdcJ3eo3iaXYQF2v4", // MENGGUNAKAN TOKEN ASLI DARI JSON
+  refreshToken: null,
   hydrated: false,
 };
 
@@ -103,38 +113,33 @@ export const useClientStore = create<ClientStore>()(
       clearAuth: () =>
         set((state) => {
           state.accessToken = null;
+          state.refreshToken = null;
           state.isAuthenticated = false;
           state.user = null;
           state.error = null;
         }),
 
-      login: async (payload: LoginPayload) => {
+      register: async (payload: RegisterPayload) => {
         set({ isLoading: true, error: null });
 
         try {
-          // Logika ini nanti perlu disesuaikan karena API Anda mengembalikan user data
-          // secara langsung di endpoint /login, bukan di endpoint terpisah /profile
-          const { data } = await axiosService.request<{ data: any }>({
-            url: '/api/eptw/auth/login',
+          await axiosService.request({
+            url: '/api/v1/auth/register',
             method: 'POST',
             data: payload,
           });
 
-          const responseData = data.data;
-
-          set((state) => {
-            state.accessToken = responseData.accessToken;
-            state.isAuthenticated = true;
-            state.user = responseData.user;
-          });
-
+          // Registrasi sukses. Kita tidak mengubah state `user` atau `accessToken` 
+          // karena user diwajibkan untuk login ulang melalui halaman Login.
           return true;
         } catch (err: any) {
-          const errorMessage = err.response?.data?.message || 'Login gagal. Periksa kredensial Anda.';
-          get().clearAuth();
+          // Tangkap pesan error dari exception NestJS (biasanya ada di err.response.data.message)
+          const errorMessage = err.response?.data?.message || 'Registrasi gagal. Pastikan email belum terdaftar dan data valid.';
           
           set((state) => {
-            state.error = errorMessage;
+            state.error = (typeof errorMessage === 'string') 
+              ? errorMessage 
+              : errorMessage.join(', '); // Handle array error dari class-validator NestJS
           });
 
           return false;
@@ -145,7 +150,60 @@ export const useClientStore = create<ClientStore>()(
         }
       },
 
-      logout: () => {
+      login: async (payload: LoginPayload) => {
+        set({ isLoading: true, error: null });
+
+        try {
+          // Destrukturisasi 'data' langsung berisi objek payload dari NestJS
+          const { data } = await axiosService.request<{ data: any }>({
+            url: '/api/v1/auth/login',
+            method: 'POST',
+            data: payload,
+          });
+
+          set((state) => {
+            // Langsung petakan nilai dari objek 'data'
+            state.accessToken = data.accessToken;
+            state.refreshToken = data.refreshToken;
+            state.user = data.user;
+            state.isAuthenticated = true;
+          });
+
+          return true;
+        } catch (err: any) {
+          // Jika backend melempar error (401/403), tangkap pesannya. Jika tidak, gunakan fallback.
+          const errorMessage = err.response?.data?.message || 'Login gagal. Periksa kredensial Anda.';
+          
+          set((state) => {
+            state.error = (typeof errorMessage === 'string') 
+              ? errorMessage 
+              : errorMessage.join(', ');
+          });
+
+          return false;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      logout: async () => {
+        const { refreshToken } = get();
+
+        // 1. Beri tahu backend untuk menghancurkan sesi (revoke token)
+        if (refreshToken) {
+          try {
+            await axiosService.request({
+              url: '/api/v1/auth/logout',
+              method: 'POST',
+              data: { refreshToken },
+            });
+          } catch (error) {
+            console.error('Gagal menghapus sesi di backend:', error);
+            // Tetap lanjutkan pembersihan lokal meskipun backend gagal/timeout
+          }
+        }
+
+        // 2. Bersihkan state dan storage lokal
         get().clearAuth();
       },
 
@@ -164,6 +222,7 @@ export const useClientStore = create<ClientStore>()(
       partialize: (state) => ({
         isAuthenticated: state.isAuthenticated,
         user: state.user,
+        refreshToken: state.refreshToken,
       }),
     }
   )
