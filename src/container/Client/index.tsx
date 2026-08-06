@@ -1,7 +1,7 @@
 import { type FC, type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import Loader from '@/components/Loader';
-import { useClientStore } from '@/stores/Client'; // Asumsi Anda menggunakan zustand sesuai referensi
+import { useClientStore } from '@/stores/Client';
 import { ENUM_ROLE_AUTH } from '@/types/route';
 
 type ClientProps = {
@@ -13,33 +13,33 @@ type ClientProps = {
 
 const Client: FC<ClientProps> = ({ children, isProtected, isUnProtected, roles }) => {
   const location = useLocation();
-  const { isAuthenticated, accessToken, hydrated, isLoading, user } = useClientStore();
-  console.log(roles, '<< ROLES')
-  console.log(user, '<< USER')
-  // Tunggu store selesai hydrasi
-  if (!hydrated || isLoading) {
+  // Hapus 'isLoading' dan 'accessToken' dari dependensi destructuring
+  const { isAuthenticated, hydrated, user } = useClientStore();
+
+  // 1. Blocker Rehidrasi (Hanya cegah render sampai LocalStorage selesai dibaca)
+  if (!hydrated) {
     return <Loader background="light" />;
   }
 
-  const isAuth = isAuthenticated && Boolean(accessToken);
+  // 2. Kunci Keamanan: Evaluasi sesi HANYA dari persisted state (isAuthenticated).
+  // Biarkan Axios Interceptor yang mengurus accessToken null saat proses request API berjalan.
+  const isAuth = isAuthenticated;
   const roleUser = user?.role?.code as ENUM_ROLE_AUTH;
 
-  // 1. Guard untuk halaman yang butuh login
+  // 3. Guard: Halaman Terproteksi
   if (isProtected && !isAuth) {
-    // Redirect ke root/login, simpan lokasi sebelumnya agar bisa dikembalikan setelah login
     return <Navigate to="/" state={{ from: location }} replace />;
   }
 
-  // 2. Guard untuk halaman "guest only" (seperti halaman Login) saat user SUDAH login
+  // 4. Guard: Halaman Guest Only (Login/Register)
   if (isUnProtected && isAuth) {
     return <Navigate to="/dashboard" replace />;
   }
-  console.log(!roleUser || !roles?.includes(roleUser), '<<<< CHECK ROLE')
-  // 3. RBAC (Role-Based Access Control)
+
+  // 5. Guard: Role-Based Access Control (RBAC)
   if (isProtected && roles && roles.length > 0) {
+    // Jika user tidak punya role valid ATAU role tidak ada di dalam whitelist
     if (!roleUser || !roles.includes(roleUser)) {
-      console.log('<<<< MASUK KONDISI')
-      // Jika role tidak sesuai, lempar ke dashboard atau halaman 403
       return <Navigate to="/dashboard" replace />;
     }
   }
