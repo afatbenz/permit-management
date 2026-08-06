@@ -1,5 +1,5 @@
 import { type ReactNode, useState } from 'react';
-import { LayoutDashboard, FileText, LogOut, Menu, Moon, Sun, X, Bell, Search, Users } from 'lucide-react';
+import { LayoutDashboard, FileText, LogOut, Menu, Moon, Sun, X, Bell, Search, Users, User } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from '@/lib/router';
@@ -11,6 +11,7 @@ const NAV: NavItem[] = [
   { label: 'Home', icon: <LayoutDashboard className="h-5 w-5" />, path: '/dashboard', match: (s) => s[0] === 'dashboard' && s.length === 1 },
   { label: 'Permit Management', icon: <FileText className="h-5 w-5" />, path: '/dashboard/permits', match: (s) => s[0] === 'dashboard' && s[1] === 'permits' },
   { label: 'Users', icon: <Users className="h-5 w-5" />, path: '/dashboard/users', match: (s) => s[0] === 'dashboard' && s[1] === 'users', adminOnly: true },
+  { label: 'Profile', icon: <User className="h-5 w-5" />, path: '/dashboard/profile', match: (s) => s[0] === 'dashboard' && s[1] === 'profile' },
 ];
 
 export function DashboardLayout({ children, active }: { children: ReactNode; active: string }) {
