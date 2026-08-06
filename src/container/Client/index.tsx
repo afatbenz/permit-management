@@ -14,14 +14,15 @@ type ClientProps = {
 const Client: FC<ClientProps> = ({ children, isProtected, isUnProtected, roles }) => {
   const location = useLocation();
   const { isAuthenticated, accessToken, hydrated, isLoading, user } = useClientStore();
-  
+  console.log(roles, '<< ROLES')
+  console.log(user, '<< USER')
   // Tunggu store selesai hydrasi
   if (!hydrated || isLoading) {
     return <Loader background="light" />;
   }
 
   const isAuth = isAuthenticated && Boolean(accessToken);
-  const roleUser = user?.role as ENUM_ROLE_AUTH;
+  const roleUser = user?.role?.code as ENUM_ROLE_AUTH;
 
   // 1. Guard untuk halaman yang butuh login
   if (isProtected && !isAuth) {

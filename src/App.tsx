@@ -6,12 +6,12 @@ import ClientRoutes from '@/components/ClientRoutes';
 function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
+      {/* <AuthProvider> */}
         {/* BrowserRouter wajib membungkus ClientRoutes agar hooks seperti useNavigate dan useLocation dapat bekerja */}
         <BrowserRouter>
           <ClientRoutes />
         </BrowserRouter>
-      </AuthProvider>
+      {/* </AuthProvider> */}
     </ThemeProvider>
   );
 }
