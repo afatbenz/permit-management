@@ -1,6 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { api, setAccessTokenGetter, setRefreshHandler, type RegisterPayload, type SessionUser } from '@/lib/api';
 
+// Exported type so pages can read the session user without importing SessionUser twice.
+export type { SessionUser };
+
 // Auth state is kept in memory only (per project decision): reloading the
 // page drops the session and the user signs in again. No token is persisted
 // to localStorage.
@@ -17,6 +20,8 @@ type AuthCtx = {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (payload: RegisterPayload) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Refetches the profile and syncs the session user (e.g. after editing profile). */
+  refreshUser: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthCtx | undefined>(undefined);
@@ -72,8 +77,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    const res = await api.getProfile();
+    if (res.user) setUser(res.user);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -11,6 +11,7 @@ import { PermitManagementPage } from '@/pages/PermitManagementPage';
 import { NewPermitPage } from '@/pages/NewPermitPage';
 import { PermitDetailPage } from '@/pages/PermitDetailPage';
 import { UsersManagementPage } from '@/pages/UsersManagementPage';
+import { ProfilePage } from '@/pages/ProfilePage';
 
 function Routes() {
   const { segments } = useRoute();
@@ -70,6 +71,7 @@ function Routes() {
     }
     return <UsersManagementPage />;
   }
+  if (segments[0] === 'dashboard' && segments[1] === 'profile') return <ProfilePage />;
   if (segments[0] === 'dashboard' && segments[1] === 'permits' && segments[2] === 'new') return <NewPermitPage />;
   if (segments[0] === 'dashboard' && segments[1] === 'permits' && segments[2]) return <PermitDetailPage id={segments[2]} />;
   if (segments[0] === 'dashboard' && segments[1] === 'permits') return <PermitManagementPage />;

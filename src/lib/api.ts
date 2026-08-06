@@ -107,6 +107,43 @@ export type ResolvedRegistrationLink = {
   subconCompanies: Array<{ id: string; name: string }>;
 };
 
+// ---- Profile + signature ----
+
+export type ProfilePayload = {
+  name?: string;
+  email?: string;
+  phone?: string;
+  jobTitle?: string;
+  /** Base64 data URL from canvas.toDataURL() — the manual draw path. */
+  signature?: string;
+};
+
+export type ProfileResponse = {
+  user: SessionUser | null;
+  signatureUrl: string | null;
+  profile: { jobTitle: string | null; defaultSignatureUrl: string | null } | null;
+};
+
+export type EvidenceType = 'SITE_MAP' | 'EQUIPMENT' | 'OTHER';
+
+export type EvidenceItem = {
+  id: string;
+  permitId: string;
+  evidenceType: EvidenceType;
+  mimeType: string;
+  sizeBytes: number;
+  uploadedBy: string;
+  url: string;
+  createdAt: string;
+};
+
+// ---- Base URL -----------------------------------------------------------
+function getBaseUrl(): string {
+  const raw = (import.meta.env.VITE_API_TARGET as string | undefined) ?? '';
+  if (!raw) return '';
+  return raw.endsWith('/') ? raw.slice(0, -1) : raw;
+}
+
 // ---- Token plumbing (set by AuthProvider) ------------------------------
 let accessToken: string | null = null;
 let accessTokenGetter: (() => string | null) | null = null;
@@ -139,8 +176,12 @@ type SuccessEnvelope<T> = { success: true; data: T };
 type ErrorEnvelope = { success: false; statusCode: number; message: string | string[] };
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const isFormData = init.body instanceof FormData;
+
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    // For multipart/form-data, let the browser set the boundary — do NOT set
+    // Content-Type manually, otherwise the server rejects the upload.
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(init.headers as Record<string, string> | undefined),
   };
 
@@ -150,7 +191,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   };
   attachToken(headers);
 
-  let res = await fetch(path, { ...init, headers });
+  const url = `${getBaseUrl()}${path}`;
+  let res = await fetch(url, { ...init, headers });
 
   // On 401, attempt one silent refresh, then retry the request.
   if (res.status === 401 && refreshHandler && !refreshing) {
@@ -161,7 +203,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     if (ok) {
       const retryHeaders = { ...headers };
       attachToken(retryHeaders);
-      res = await fetch(path, { ...init, headers: retryHeaders });
+      res = await fetch(url, { ...init, headers: retryHeaders });
     }
   }
 
@@ -177,6 +219,19 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   const success = body as SuccessEnvelope<T>;
   return success.data;
+}
+
+/** Fetches a binary asset (image bytes) with the auth header attached. */
+export async function fetchBlob(path: string): Promise<Blob> {
+  const token = currentAccessToken();
+  const url = `${getBaseUrl()}${path}`;
+  const res = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (!res.ok) {
+    throw new ApiError(`Gagal memuat file (${res.status})`, res.status);
+  }
+  return res.blob();
 }
 
 // ---- Auth endpoints ----------------------------------------------------
@@ -243,5 +298,61 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ roleId }),
     });
+  },
+
+  // ---- Profile / signature ----
+
+  async getProfile(): Promise<ProfileResponse> {
+    return request<ProfileResponse>('/api/v1/profile');
+  },
+
+  /** JSON path: profile fields + base64 `signature` (canvas draw). */
+  async updateProfileJson(payload: ProfilePayload): Promise<ProfileResponse> {
+    return request<ProfileResponse>('/api/v1/profile', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /** Multipart path: profile fields + `file` (file picker). */
+  async updateProfileMultipart(
+    payload: ProfilePayload,
+    file: File,
+  ): Promise<ProfileResponse> {
+    const fd = new FormData();
+    if (payload.name) fd.append('name', payload.name);
+    if (payload.email) fd.append('email', payload.email);
+    if (payload.phone) fd.append('phone', payload.phone);
+    if (payload.jobTitle) fd.append('jobTitle', payload.jobTitle);
+    fd.append('file', file);
+    return request<ProfileResponse>('/api/v1/profile', { method: 'PUT', body: fd });
+  },
+
+  // ---- Permit evidence ----
+
+  /**
+   * Uploads multiple evidence files for a permit.
+   * `files` aligned by index with `types` (e.g. SITE_MAP, EQUIPMENT).
+   */
+  async uploadEvidences(
+    permitId: string,
+    files: File[],
+    types: EvidenceType[],
+  ): Promise<{ message: string; evidences: EvidenceItem[] }> {
+    const fd = new FormData();
+    for (const f of files) fd.append('files', f);
+    const typesParam = encodeURIComponent(JSON.stringify(types));
+    return request<{ message: string; evidences: EvidenceItem[] }>(
+      `/api/v1/permits/${permitId}/evidences?types=${typesParam}`,
+      { method: 'POST', body: fd },
+    );
+  },
+
+  async listEvidences(
+    permitId: string,
+    evidenceType?: EvidenceType,
+  ): Promise<{ evidences: EvidenceItem[] }> {
+    const q = evidenceType ? `?evidenceType=${evidenceType}` : '';
+    return request<{ evidences: EvidenceItem[] }>(`/api/v1/permits/${permitId}/evidences${q}`);
   },
 };
