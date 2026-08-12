@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { ThemeProvider } from '@/lib/theme';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { RouterProvider, useRoute, useRouter } from '@/lib/router';
@@ -11,6 +12,8 @@ import { PermitManagementPage } from '@/pages/PermitManagementPage';
 import { NewPermitPage } from '@/pages/NewPermitPage';
 import { PermitDetailPage } from '@/pages/PermitDetailPage';
 import { UsersManagementPage } from '@/pages/UsersManagementPage';
+import { OrganizationSettingsPage } from '@/pages/OrganizationSettingsPage';
+import { ProjectsPage } from '@/pages/ProjectsPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 
 function Routes() {
@@ -62,15 +65,19 @@ function Routes() {
     return null;
   }
 
-  // Users management — admin (org_admin / super_admin) only.
+  // Admin-only dashboard pages — org_admin / super_admin. (Project Admin is
+  // intentionally excluded: the backend project controller is admin-only.)
   const isAdmin = user?.role?.code === 'org_admin' || user?.role?.code === 'super_admin';
-  if (segments[0] === 'dashboard' && segments[1] === 'users') {
+  const adminRoute = (page: ReactNode) => {
     if (!isAdmin) {
       navigate('/dashboard');
       return null;
     }
-    return <UsersManagementPage />;
-  }
+    return page;
+  };
+  if (segments[0] === 'dashboard' && segments[1] === 'users') return adminRoute(<UsersManagementPage />);
+  if (segments[0] === 'dashboard' && segments[1] === 'settings') return adminRoute(<OrganizationSettingsPage />);
+  if (segments[0] === 'dashboard' && segments[1] === 'projects') return adminRoute(<ProjectsPage />);
   if (segments[0] === 'dashboard' && segments[1] === 'profile') return <ProfilePage />;
   if (segments[0] === 'dashboard' && segments[1] === 'permits' && segments[2] === 'new') return <NewPermitPage />;
   if (segments[0] === 'dashboard' && segments[1] === 'permits' && segments[2]) return <PermitDetailPage id={segments[2]} />;

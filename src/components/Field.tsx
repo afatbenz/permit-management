@@ -73,6 +73,48 @@ export function SuggestionInput({
   );
 }
 
+type SelectFieldProps = {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: Array<{ value: string; label: string }>;
+  placeholder?: string;
+  required?: boolean;
+  id?: string;
+};
+
+/** Native <select> styled like Field — for province/city/role dropdowns. */
+export function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+  required,
+  id,
+}: SelectFieldProps) {
+  return (
+    <div>
+      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">
+        {label} {required && <span className="text-rose-500">*</span>}
+      </label>
+      <select
+        id={id}
+        className="input-field"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        {placeholder && <option value="">{placeholder}</option>}
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 type FieldProps = {
   label: string;
   value: string;

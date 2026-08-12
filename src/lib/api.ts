@@ -25,6 +25,7 @@ export type RoleCode =
   | 'supervisor_maincon'
   | 'hse_maincon'
   | 'cm_maincon'
+  | 'project_admin'
   | 'unassigned';
 
 export type AuthRole = { id: string; code: RoleCode; name: string };
@@ -49,6 +50,7 @@ export type RegisterPayload = {
   name: string;
   email: string;
   password: string;
+  confirmPassword: string;
   phone: string;
 };
 
@@ -64,23 +66,112 @@ export type RegisterResponse = {
 
 export type CreateOrganizationPayload = {
   organizationName: string;
-  adminName: string;
-  adminEmail: string;
-  adminPassword: string;
-  adminPhone: string;
+  address?: string;
+  city: string;
+  province: string;
 };
 
 export type CreateOrganizationResponse = {
   organization: { id: string; name: string; code: string };
-  admin: SessionUser;
+  defaultProject: { id: string; projectCode: string; name: string };
+  invitationCode: string;
   promoted: boolean;
 };
 
 export type JoinOrganizationPayload = {
-  inviteToken: string;
+  invitationCode: string;
+};
+
+export type JoinOrganizationResponse = {
+  message: string;
+  project: { id: string; name: string; projectCode: string };
+  status: 'pending';
+};
+
+// ---- Location reference data (public) ----
+
+export type Province = { id: string; name: string };
+export type City = { id: string; name: string; province: string | null; provinceId: string };
+export type ListProvincesResponse = { provinces: Province[] };
+export type ListCitiesResponse = { cities: City[] };
+
+// ---- Projects ----
+
+export type Project = {
+  id: string;
+  organizationId: string;
+  projectCode: string;
   name: string;
-  password: string;
-  phone: string;
+  projectAdminId: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  /** Active invitation code for the project (listProjects only). */
+  invitationCode?: string | null;
+};
+
+export type CreateProjectResponse = {
+  project: Project;
+  invitationCode: string;
+};
+
+export type OrgProjectWithMembers = {
+  id: string;
+  name: string;
+  projectCode: string;
+  projectAdminId: string | null;
+  members: Array<{
+    userId: string;
+    name: string | null;
+    email: string | null;
+    roleId: string | null;
+    roleCode: RoleCode | null;
+    roleName: string | null;
+  }>;
+};
+
+export type InvitationCode = {
+  id: string;
+  projectId: string;
+  projectName: string | null;
+  code: string;
+  status: string;
+  createdAt: string;
+};
+
+// ---- Org settings ----
+
+export type UpdateOrganizationSettingsPayload = {
+  name?: string;
+  address?: string;
+  city?: string;
+  province?: string;
+};
+
+// ---- Member join-by-code requests ----
+
+export type MemberRequest = {
+  id: string;
+  projectId: string;
+  projectName: string | null;
+  userId: string;
+  userName: string | null;
+  userEmail: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+};
+
+export type Notification = {
+  id: string;
+  organizationId: string;
+  recipientId: string;
+  type: string;
+  title: string;
+  message: string | null;
+  data: Record<string, unknown> | null;
+  isRead: boolean;
+  createdAt: string;
+  createdBy: string | null;
 };
 
 // ---- User management (Org Admin) ----
@@ -96,6 +187,12 @@ export type AdminUser = {
   verificationStatus: string;
   status: string;
   createdAt: string;
+};
+
+export type AssignableRole = {
+  id: string;
+  code: RoleCode;
+  name: string;
 };
 
 export type ListUsersResponse = {
@@ -276,10 +373,110 @@ export const api = {
     });
   },
 
-  async joinOrganization(payload: JoinOrganizationPayload): Promise<RegisterResponse> {
-    return request<RegisterResponse>('/api/v1/organizations/join', {
+  async joinOrganizationByCode(payload: JoinOrganizationPayload): Promise<JoinOrganizationResponse> {
+    return request<JoinOrganizationResponse>('/api/v1/organizations/join-code', {
       method: 'POST',
       body: JSON.stringify(payload),
+    });
+  },
+
+  // ---- Location reference data ----
+
+  async listProvinces(): Promise<ListProvincesResponse> {
+    return request<ListProvincesResponse>('/api/v1/locations/provinces');
+  },
+
+  async listCities(provinceId?: string): Promise<ListCitiesResponse> {
+    const q = provinceId ? `?provinceId=${encodeURIComponent(provinceId)}` : '';
+    return request<ListCitiesResponse>(`/api/v1/locations/cities${q}`);
+  },
+
+  // ---- Projects ----
+
+  async listProjects(): Promise<{ projects: Project[] }> {
+    return request<{ projects: Project[] }>('/api/v1/projects');
+  },
+
+  async createProject(payload: { name: string }): Promise<CreateProjectResponse> {
+    return request<CreateProjectResponse>('/api/v1/projects', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getProject(projectId: string): Promise<{ project: Project }> {
+    return request<{ project: Project }>(`/api/v1/projects/${projectId}`);
+  },
+
+  async deleteProject(projectId: string): Promise<{ message: string; projectId: string }> {
+    return request<{ message: string; projectId: string }>(`/api/v1/projects/${projectId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // ---- Org settings ----
+
+  async getInvitationCodes(organizationId: string): Promise<{ codes: InvitationCode[] }> {
+    return request<{ codes: InvitationCode[] }>(
+      `/api/v1/organizations/${organizationId}/invitation-codes`,
+    );
+  },
+
+  async getOrganizationSettings(organizationId: string): Promise<{
+    organization: { id: string; name: string; address: string | null; city: string | null; province: string | null };
+  }> {
+    return request(`/api/v1/organizations/${organizationId}/settings`);
+  },
+
+  async updateOrganizationSettings(
+    organizationId: string,
+    payload: UpdateOrganizationSettingsPayload,
+  ): Promise<{ organization: { id: string; name: string; address: string | null; city: string | null; province: string | null } }> {
+    return request(`/api/v1/organizations/${organizationId}/settings`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // ---- Member join-by-code requests ----
+
+  async listOrgProjects(organizationId: string): Promise<{ projects: OrgProjectWithMembers[] }> {
+    return request<{ projects: OrgProjectWithMembers[] }>(
+      `/api/v1/organizations/${organizationId}/projects`,
+    );
+  },
+
+  async listMemberRequests(
+    organizationId: string,
+  ): Promise<{ requests: MemberRequest[] }> {
+    return request<{ requests: MemberRequest[] }>(
+      `/api/v1/organizations/${organizationId}/member-requests`,
+    );
+  },
+
+  async approveMemberRequest(organizationId: string, requestId: string): Promise<{ message: string }> {
+    return request<{ message: string }>(
+      `/api/v1/organizations/${organizationId}/member-requests/${requestId}/approve`,
+      { method: 'POST' },
+    );
+  },
+
+  async rejectMemberRequest(organizationId: string, requestId: string): Promise<{ message: string }> {
+    return request<{ message: string }>(
+      `/api/v1/organizations/${organizationId}/member-requests/${requestId}/reject`,
+      { method: 'POST' },
+    );
+  },
+
+  // ---- Notifications ----
+
+  async listNotifications(): Promise<{ notifications: Notification[]; unreadCount: number }> {
+    return request<{ notifications: Notification[]; unreadCount: number }>('/api/v1/notifications');
+  },
+
+  async markNotificationRead(id: string): Promise<{ message: string; id: string }> {
+    return request<{ message: string; id: string }>(`/api/v1/notifications/${id}/read`, {
+      method: 'PATCH',
     });
   },
 
@@ -293,11 +490,32 @@ export const api = {
     return request<ListUsersResponse>(`/api/v1/organizations/${organizationId}/users`);
   },
 
-  async updateUserRole(organizationId: string, userId: string, roleId: string): Promise<{ message: string }> {
+  async listAssignableRoles(): Promise<{ roles: AssignableRole[] }> {
+    return request<{ roles: AssignableRole[] }>('/api/v1/organizations/roles');
+  },
+
+  async updateUserRole(
+    organizationId: string,
+    userId: string,
+    roleId: string,
+    projectId?: string,
+  ): Promise<{ message: string }> {
     return request<{ message: string }>(`/api/v1/organizations/${organizationId}/users/${userId}/role`, {
       method: 'PATCH',
-      body: JSON.stringify({ roleId }),
+      body: JSON.stringify(projectId ? { roleId, projectId } : { roleId }),
     });
+  },
+
+  /** project_admin / org_admin set a user's role inside a specific project. */
+  async updateProjectUserRole(
+    projectId: string,
+    userId: string,
+    roleId: string,
+  ): Promise<{ message: string }> {
+    return request<{ message: string }>(
+      `/api/v1/organizations/projects/${projectId}/users/${userId}/role`,
+      { method: 'PATCH', body: JSON.stringify({ roleId }) },
+    );
   },
 
   // ---- Profile / signature ----
