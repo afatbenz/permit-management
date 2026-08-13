@@ -1,9 +1,10 @@
 import { type ReactNode, useState } from 'react';
-import { LayoutDashboard, FileText, LogOut, Menu, Moon, Sun, X, Bell, Search, Users, User, Settings2, FolderKanban } from 'lucide-react';
+import { LayoutDashboard, FileText, LogOut, Menu, Moon, Sun, X, Search, Users, User, Settings2, FolderKanban } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from '@/lib/router';
 import { Logo } from '@/components/ui';
+import { NotificationBell } from '@/components/NotificationBell';
 
 type NavItem = { label: string; icon: ReactNode; path: string; match: (segs: string[]) => boolean; adminOnly?: boolean };
 
@@ -122,10 +123,7 @@ export function DashboardLayout({ children, active }: { children: ReactNode; act
             <button onClick={toggle} className="rounded-xl p-2.5 text-gray-500 transition-colors hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-800" aria-label="Toggle theme">
               {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </button>
-            <button className="relative rounded-xl p-2.5 text-gray-500 transition-colors hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-800" aria-label="Notifications">
-              <Bell className="h-5 w-5" />
-              <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900" />
-            </button>
+            <NotificationBell />
             <div className="ml-1 flex items-center gap-2.5">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white">
                 {initials || 'U'}
