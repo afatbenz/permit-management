@@ -1,11 +1,11 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Save, Building2, Map, Wrench, Trash2, FileUp } from 'lucide-react';
 import { addPermit, type PermitInput } from '@/lib/supabase';
-import { api, type EvidenceType } from '@/lib/api';
+import { api, type EvidenceType, type PermitCategory, type Project } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from '@/lib/router';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { Field, SuggestionInput } from '@/components/Field';
+import { Field, SuggestionInput, SelectField } from '@/components/Field';
 import { Spinner } from '@/components/ui';
 
 const DEPARTMENTS = [
@@ -31,6 +31,17 @@ const EVIDENCE_MAX_MB = 5;
 const EVIDENCE_TYPES: Array<{ type: EvidenceType; label: string; icon: JSX.Element }> = [
   { type: 'SITE_MAP', label: 'Denah', icon: <Map className="h-4 w-4" /> },
   { type: 'EQUIPMENT', label: 'Alat', icon: <Wrench className="h-4 w-4" /> },
+];
+
+/** Fallback when the category API is unreachable (e.g. admin-only projects). */
+const FALLBACK_CATEGORIES: PermitCategory[] = [
+  { id: 'sys-general', name: 'General Permit', color: '#0284C7', sortOrder: 10, scope: 'system', isDefault: true, removable: false },
+  { id: 'sys-wah', name: 'WAH', color: '#D97706', sortOrder: 20, scope: 'system', isDefault: true, removable: false },
+  { id: 'sys-confined', name: 'Confined Space', color: '#7C3AED', sortOrder: 30, scope: 'system', isDefault: true, removable: false },
+  { id: 'sys-electrical', name: 'Electrical', color: '#EAB308', sortOrder: 40, scope: 'system', isDefault: true, removable: false },
+  { id: 'sys-lifting', name: 'Lifting', color: '#DC2626', sortOrder: 50, scope: 'system', isDefault: true, removable: false },
+  { id: 'sys-panas', name: 'Pekerjaan Panas', color: '#EA580C', sortOrder: 60, scope: 'system', isDefault: true, removable: false },
+  { id: 'sys-galian', name: 'Pekerjaan Galian', color: '#059669', sortOrder: 70, scope: 'system', isDefault: true, removable: false },
 ];
 
 type PendingEvidence = { file: File; type: EvidenceType };
@@ -60,9 +71,53 @@ export function NewPermitPage() {
   const [evidence, setEvidence] = useState<PendingEvidence[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [categories, setCategories] = useState<PermitCategory[]>(FALLBACK_CATEGORIES);
+  const [selectedProjectId, setSelectedProjectId] = useState('');
 
   const siteMapRef = useRef<HTMLInputElement>(null);
   const equipmentRef = useRef<HTMLInputElement>(null);
+
+  // Load the caller's projects. spv_subcon has no admin listProjects, so fall
+  // back to "my projects"; if even that fails, the project field just stays a
+  // free-text input.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.listMyProjects();
+        if (res.projects.length > 0) {
+          setProjects(res.projects);
+          return;
+        }
+        const all = await api.listProjects();
+        setProjects(all.projects);
+      } catch {
+        /* keep projects empty → fallback text input */
+      }
+    })();
+  }, []);
+
+  // Categories follow the selected project; reset when it changes.
+  useEffect(() => {
+    if (!selectedProjectId) {
+      setCategories(FALLBACK_CATEGORIES);
+      setForm((p) => ({ ...p, category_id: undefined, category_name: undefined, category_color: undefined }));
+      return;
+    }
+    let cancelled = false;
+    api
+      .listProjectCategories(selectedProjectId)
+      .then((res) => {
+        if (cancelled) return;
+        setCategories(res.categories.length > 0 ? res.categories : FALLBACK_CATEGORIES);
+      })
+      .catch(() => {
+        if (!cancelled) setCategories(FALLBACK_CATEGORIES);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProjectId]);
 
   const set = (key: keyof PermitInput, value: string) => setForm((p) => ({ ...p, [key]: value }));
 
@@ -91,6 +146,10 @@ export function NewPermitPage() {
 
     if (!form.department || !form.contractor_name || !form.address_1 || !form.city || !form.province || !form.project) {
       setError('Please fill in all required fields.');
+      return;
+    }
+    if (!form.category_id || !form.category_name || !form.category_color) {
+      setError('Silakan pilih kategori permit.');
       return;
     }
 
@@ -144,7 +203,40 @@ export function NewPermitPage() {
               <Building2 className="h-4 w-4 text-brand-600 dark:text-brand-400" />
               <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">Project Information</h2>
             </div>
-            <Field id="project" label="Nama Project" value={form.project} onChange={(v) => set('project', v)} placeholder="e.g. Pembangunan Jembatan Surabaya" required />
+            {projects.length > 0 ? (
+              <SelectField
+                id="project"
+                label="Nama Project"
+                value={selectedProjectId}
+                onChange={(v) => {
+                  setSelectedProjectId(v);
+                  const p = projects.find((x) => x.id === v);
+                  setForm((prev) => ({ ...prev, project_id: v, project: p?.name ?? '' }));
+                }}
+                options={projects.map((p) => ({ value: p.id, label: p.name }))}
+                placeholder="Pilih proyek"
+                required
+              />
+            ) : (
+              <Field id="project" label="Nama Project" value={form.project} onChange={(v) => set('project', v)} placeholder="e.g. Pembangunan Jembatan Surabaya" required />
+            )}
+            <SelectField
+              id="category"
+              label="Kategori Permit"
+              value={form.category_id ?? ''}
+              onChange={(v) => {
+                const c = categories.find((x) => x.id === v);
+                setForm((prev) => ({
+                  ...prev,
+                  category_id: c?.id,
+                  category_name: c?.name,
+                  category_color: c?.color,
+                }));
+              }}
+              options={categories.map((c) => ({ value: c.id, label: c.name }))}
+              placeholder="Pilih kategori"
+              required
+            />
             <SuggestionInput
               id="department"
               label="Nama Departemen"

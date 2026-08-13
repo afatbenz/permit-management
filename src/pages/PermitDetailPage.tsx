@@ -1,17 +1,34 @@
-import { ArrowLeft, Building2, MapPin, User, Calendar, FileText, CheckCircle2, XCircle, Clock, Trash2, ArrowRight } from 'lucide-react';
-import { getPermit, deletePermit, type Permit } from '@/lib/supabase';
+import { ArrowLeft, Building2, MapPin, User, Calendar, FileText, CheckCircle2, XCircle, Clock, Trash2, ArrowRight, Tag, Check, Ban } from 'lucide-react';
+import { useState } from 'react';
+import { getPermit, deletePermit, approvePermit, rejectPermit, type Permit } from '@/lib/supabase';
 import { useRouter } from '@/lib/router';
+import { useAuth } from '@/lib/auth';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { StatusBadge, EmptyState } from '@/components/ui';
+import { hexWithAlpha } from '@/lib/categoryColors';
 
 export function PermitDetailPage({ id }: { id: string }) {
   const { navigate } = useRouter();
-  const permit: Permit | undefined = getPermit(id);
+  const { user } = useAuth();
+  const [permit, setPermit] = useState<Permit | undefined>(() => getPermit(id));
 
   const handleDelete = () => {
     if (!confirm('Are you sure you want to delete this permit? This cannot be undone.')) return;
     deletePermit(id);
     navigate('/dashboard/permits');
+  };
+
+  const canAct = permit?.status === 'pending' && permit.current_approver_role === user?.role?.code;
+
+  const handleApprove = () => {
+    const updated = approvePermit(id);
+    if (updated) setPermit(updated);
+  };
+
+  const handleReject = () => {
+    if (!confirm('Reject permit ini? Tindakan tidak dapat dibatalkan.')) return;
+    const updated = rejectPermit(id);
+    if (updated) setPermit(updated);
   };
 
   const formatDateTime = (iso: string) =>
@@ -32,11 +49,20 @@ export function PermitDetailPage({ id }: { id: string }) {
     );
   }
 
+  const ROLE_LABELS: Record<string, string> = {
+    supervisor_subcon: 'Supervisor Subcon',
+    supervisor_maincon: 'Supervisor Maincon',
+    hse_maincon: 'HSE Maincon',
+    cm_maincon: 'CM Maincon',
+  };
+
   const INFO_ROWS = [
     { icon: <FileText className="h-4 w-4" />, label: 'Permit ID', value: permit.permit_number, mono: true },
     { icon: <Building2 className="h-4 w-4" />, label: 'Department', value: permit.department },
     { icon: <Building2 className="h-4 w-4" />, label: 'Contractor', value: permit.contractor_name },
+    { icon: <Tag className="h-4 w-4" />, label: 'Kategori', value: permit.category_name ?? '—' },
     { icon: <User className="h-4 w-4" />, label: 'Submitted by', value: permit.user_email },
+    { icon: <Clock className="h-4 w-4" />, label: 'Menunggu Approval', value: permit.current_approver_role ? ROLE_LABELS[permit.current_approver_role] ?? permit.current_approver_role : '—' },
     { icon: <Calendar className="h-4 w-4" />, label: 'Tanggal Pengajuan', value: formatDateTime(permit.created_at) },
     { icon: <Calendar className="h-4 w-4" />, label: 'Last Updated', value: formatDateTime(permit.updated_at) },
   ];
@@ -55,21 +81,67 @@ export function PermitDetailPage({ id }: { id: string }) {
         </button>
 
         {/* Header card */}
-        <div className="card p-6">
+        <div className="card relative overflow-hidden p-6">
+          {permit.category_color && (
+            <div className="absolute inset-x-0 top-0 h-1.5" style={{ backgroundColor: permit.category_color }} />
+          )}
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
             <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+              <div
+                className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl"
+                style={
+                  permit.category_color
+                    ? {
+                        color: permit.category_color,
+                        backgroundColor: hexWithAlpha(permit.category_color, 0.08),
+                      }
+                    : undefined
+                }
+              >
                 <FileText className="h-6 w-6" />
               </div>
               <div>
                 <h1 className="text-xl font-extrabold tracking-tight text-gray-900 dark:text-white">{permit.project}</h1>
                 <p className="mt-0.5 font-mono text-xs text-brand-600 dark:text-brand-400">{permit.permit_number}</p>
-                <div className="mt-2"><StatusBadge status={permit.status} /></div>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <StatusBadge status={permit.status} />
+                  {permit.category_name && permit.category_color && (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset"
+                      style={{
+                        color: permit.category_color,
+                        backgroundColor: hexWithAlpha(permit.category_color, 0.08),
+                        boxShadow: `inset 0 0 0 1px ${hexWithAlpha(permit.category_color, 0.25)}`,
+                      }}
+                    >
+                      <Tag className="h-3 w-3" />
+                      {permit.category_name}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-            <button onClick={handleDelete} className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 px-3 py-2 text-xs font-medium text-rose-600 transition-all hover:bg-rose-50 dark:border-rose-500/30 dark:text-rose-400 dark:hover:bg-rose-500/10">
-              <Trash2 className="h-3.5 w-3.5" /> Delete
-            </button>
+            <div className="flex items-center gap-2">
+              {canAct && (
+                <>
+                  <button
+                    onClick={handleReject}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 px-3 py-2 text-xs font-medium text-rose-600 transition-all hover:bg-rose-50 dark:border-rose-500/30 dark:text-rose-400 dark:hover:bg-rose-500/10"
+                  >
+                    <Ban className="h-3.5 w-3.5" /> Reject
+                  </button>
+                  <button
+                    onClick={handleApprove}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-emerald-700"
+                  >
+                    <Check className="h-3.5 w-3.5" /> Approve
+                  </button>
+                </>
+              )}
+              <button onClick={handleDelete} className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 px-3 py-2 text-xs font-medium text-rose-600 transition-all hover:bg-rose-50 dark:border-rose-500/30 dark:text-rose-400 dark:hover:bg-rose-500/10">
+                <Trash2 className="h-3.5 w-3.5" /> Delete
+              </button>
+            </div>
           </div>
         </div>
 

@@ -1,20 +1,121 @@
 import { type ReactNode, useState } from 'react';
-import { LayoutDashboard, FileText, LogOut, Menu, Moon, Sun, X, Search, Users, User, Settings2, FolderKanban } from 'lucide-react';
+import {
+  LayoutDashboard,
+  FileText,
+  LogOut,
+  Menu,
+  Moon,
+  Sun,
+  X,
+  Search,
+  Users,
+  User,
+  Settings2,
+  FolderKanban,
+  FolderTree,
+  ChevronDown,
+  ShieldCheck,
+} from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from '@/lib/router';
+import type { RoleCode } from '@/lib/api';
 import { Logo } from '@/components/ui';
 import { NotificationBell } from '@/components/NotificationBell';
 
-type NavItem = { label: string; icon: ReactNode; path: string; match: (segs: string[]) => boolean; adminOnly?: boolean };
+type NavChild = {
+  label: string;
+  icon: ReactNode;
+  path: string;
+  match: (segs: string[]) => boolean;
+  adminOnly?: boolean;
+  excludeRoles?: RoleCode[];
+};
+type NavGroup = {
+  label: string;
+  icon: ReactNode;
+  /** 'admin' = org_admin || super_admin; 'adminOrProjectAdmin' also admits project_admin. */
+  gate?: 'admin' | 'adminOrProjectAdmin';
+  children: NavChild[];
+};
+type NavEntry = { kind: 'item' } & NavChild | { kind: 'group' } & NavGroup;
 
-const NAV: NavItem[] = [
-  { label: 'Home', icon: <LayoutDashboard className="h-5 w-5" />, path: '/dashboard', match: (s) => s[0] === 'dashboard' && s.length === 1 },
-  { label: 'Permit Management', icon: <FileText className="h-5 w-5" />, path: '/dashboard/permits', match: (s) => s[0] === 'dashboard' && s[1] === 'permits' },
-  { label: 'Users', icon: <Users className="h-5 w-5" />, path: '/dashboard/users', match: (s) => s[0] === 'dashboard' && s[1] === 'users', adminOnly: true },
-  { label: 'Organization Settings', icon: <Settings2 className="h-5 w-5" />, path: '/dashboard/settings', match: (s) => s[0] === 'dashboard' && s[1] === 'settings', adminOnly: true },
-  { label: 'Projects', icon: <FolderKanban className="h-5 w-5" />, path: '/dashboard/projects', match: (s) => s[0] === 'dashboard' && s[1] === 'projects', adminOnly: true },
-  { label: 'Profile', icon: <User className="h-5 w-5" />, path: '/dashboard/profile', match: (s) => s[0] === 'dashboard' && s[1] === 'profile' },
+const NAV: NavEntry[] = [
+  {
+    kind: 'item',
+    label: 'Home',
+    icon: <LayoutDashboard className="h-5 w-5" />,
+    path: '/dashboard',
+    match: (s) => s[0] === 'dashboard' && s.length === 1,
+  },
+  {
+    kind: 'group',
+    label: 'Permit Management',
+    icon: <FileText className="h-5 w-5" />,
+    children: [
+      {
+        label: 'All Request',
+        icon: <FileText className="h-4 w-4" />,
+        path: '/dashboard/permits',
+        match: (s) => s[0] === 'dashboard' && s[1] === 'permits' && s.length === 2,
+      },
+      {
+        label: 'Waiting Approval',
+        icon: <ShieldCheck className="h-4 w-4" />,
+        path: '/dashboard/permits/waiting',
+        match: (s) => s[0] === 'dashboard' && s[1] === 'permits' && s[2] === 'waiting',
+        excludeRoles: ['supervisor_subcon'],
+      },
+    ],
+  },
+  {
+    kind: 'group',
+    label: 'Project',
+    icon: <FolderKanban className="h-5 w-5" />,
+    gate: 'adminOrProjectAdmin',
+    children: [
+      {
+        label: 'All Project',
+        icon: <FolderKanban className="h-4 w-4" />,
+        path: '/dashboard/projects',
+        match: (s) => s[0] === 'dashboard' && s[1] === 'projects' && s.length === 2,
+        adminOnly: true,
+      },
+      {
+        label: 'Project Category',
+        icon: <FolderTree className="h-4 w-4" />,
+        path: '/dashboard/projects/categories',
+        match: (s) => s[0] === 'dashboard' && s[1] === 'projects' && s[2] === 'categories',
+      },
+    ],
+  },
+  {
+    kind: 'group',
+    label: 'Settings',
+    icon: <Settings2 className="h-5 w-5" />,
+    children: [
+      {
+        label: 'Users',
+        icon: <Users className="h-4 w-4" />,
+        path: '/dashboard/users',
+        match: (s) => s[0] === 'dashboard' && s[1] === 'users',
+        adminOnly: true,
+      },
+      {
+        label: 'Organization',
+        icon: <Settings2 className="h-4 w-4" />,
+        path: '/dashboard/settings',
+        match: (s) => s[0] === 'dashboard' && s[1] === 'settings',
+        adminOnly: true,
+      },
+      {
+        label: 'Profile',
+        icon: <User className="h-4 w-4" />,
+        path: '/dashboard/profile',
+        match: (s) => s[0] === 'dashboard' && s[1] === 'profile',
+      },
+    ],
+  },
 ];
 
 export function DashboardLayout({ children, active }: { children: ReactNode; active: string }) {
@@ -22,6 +123,7 @@ export function DashboardLayout({ children, active }: { children: ReactNode; act
   const { user, signOut } = useAuth();
   const { navigate } = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
   const displayName = user?.name ?? user?.email ?? 'Pengguna';
   const initials = displayName
@@ -31,17 +133,83 @@ export function DashboardLayout({ children, active }: { children: ReactNode; act
     .map((p) => p[0]?.toUpperCase() ?? '')
     .join('');
   const roleName = user?.role?.name ?? '';
-  const isOrgAdmin = user?.role?.code === 'org_admin' || user?.role?.code === 'super_admin';
-  const visibleNav = NAV.filter((item) => !item.adminOnly || isOrgAdmin);
+  const roleCode = user?.role?.code;
+  const isAdmin = roleCode === 'org_admin' || roleCode === 'super_admin';
+  const isProjectAdmin = roleCode === 'project_admin';
+
+  const toggleGroup = (label: string, expanded: boolean) =>
+    setOpenGroups((prev) => ({ ...prev, [label]: expanded ?? !prev[label] }));
+
+  // Filter visible entries by role.
+  const visible = NAV.filter((entry) => {
+    if (entry.kind === 'item') {
+      if (entry.adminOnly && !isAdmin) return false;
+      if (entry.excludeRoles?.includes(roleCode ?? 'unassigned')) return false;
+      return true;
+    }
+    if (entry.gate === 'admin' && !isAdmin) return false;
+    if (entry.gate === 'adminOrProjectAdmin' && !isAdmin && !isProjectAdmin) return false;
+    const visibleChildren = entry.children.filter((c) => {
+      if (c.adminOnly && !isAdmin) return false;
+      if (c.excludeRoles?.includes(roleCode ?? 'unassigned')) return false;
+      return true;
+    });
+    return visibleChildren.length > 0;
+  });
+
+  const childActive = (child: NavChild) => child.label === active;
+  const groupActive = (group: NavGroup) => group.children.some((c) => childActive(c));
 
   const handleNav = (path: string) => {
     navigate(path);
     setMobileOpen(false);
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/login');
+  const itemClasses = (isActive: boolean) =>
+    `group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+      isActive
+        ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300'
+        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
+    }`;
+
+  const iconClasses = (isActive: boolean) =>
+    `transition-colors ${isActive ? 'text-brand-600 dark:text-brand-400' : 'text-gray-400 group-hover:text-gray-600 dark:text-slate-500 dark:group-hover:text-slate-300'}`;
+
+  const renderChild = (child: NavChild) => {
+    const isActive = childActive(child);
+    return (
+      <button key={child.path} onClick={() => handleNav(child.path)} className={itemClasses(isActive)}>
+        <span className={iconClasses(isActive)}>{child.icon}</span>
+        {child.label}
+      </button>
+    );
+  };
+
+  const renderGroup = (group: NavGroup) => {
+    // Groups stay open once shown; only an explicit click closes them. This
+    // way navigating to another group never collapses the one you were in.
+    const expanded = openGroups[group.label] ?? true;
+    return (
+      <div key={group.label}>
+        <button
+          onClick={() => toggleGroup(group.label, !expanded)}
+          className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+            groupActive(group)
+              ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300'
+              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
+          }`}
+        >
+          <span className={iconClasses(groupActive(group))}>{group.icon}</span>
+          <span className="flex-1 text-left">{group.label}</span>
+          <ChevronDown
+            className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''} ${
+              groupActive(group) ? 'text-brand-600 dark:text-brand-400' : 'text-gray-400 dark:text-slate-500'
+            }`}
+          />
+        </button>
+        {expanded && <div className="mt-1 space-y-1 pl-4">{group.children.map(renderChild)}</div>}
+      </div>
+    );
   };
 
   const SidebarContent = (
@@ -51,30 +219,16 @@ export function DashboardLayout({ children, active }: { children: ReactNode; act
           <Logo />
         </button>
       </div>
-      <nav className="mt-2 flex-1 space-y-1 px-3">
+      <nav className="mt-2 flex-1 space-y-1 overflow-y-auto px-3">
         <p className="px-3 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Menu</p>
-        {visibleNav.map((item) => {
-          const isActive = item.label === active;
-          return (
-            <button
-              key={item.path}
-              onClick={() => handleNav(item.path)}
-              className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all
-                ${isActive
-                  ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'}`}
-            >
-              <span className={`transition-colors ${isActive ? 'text-brand-600 dark:text-brand-400' : 'text-gray-400 group-hover:text-gray-600 dark:text-slate-500 dark:group-hover:text-slate-300'}`}>
-                {item.icon}
-              </span>
-              {item.label}
-            </button>
-          );
-        })}
+        {visible.map((entry) => (entry.kind === 'item' ? renderChild(entry) : renderGroup(entry)))}
       </nav>
       <div className="border-t border-gray-200 p-3 dark:border-slate-800">
         <button
-          onClick={handleSignOut}
+          onClick={async () => {
+            await signOut();
+            navigate('/login');
+          }}
           className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-rose-50 hover:text-rose-600 dark:text-slate-400 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
         >
           <LogOut className="h-5 w-5 text-gray-400 dark:text-slate-500" />

@@ -15,7 +15,11 @@ export function ProjectsPage() {
   const [success, setSuccess] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
+  const [projectCode, setProjectCode] = useState('');
   const [copied, setCopied] = useState<string | null>(null);
+
+  const codeValid = /^[A-Z0-9-]{3,20}$/.test(projectCode);
+  const canSubmit = name.trim().length > 0 && codeValid && !creating;
 
   const orgId = user?.organizationId ?? '';
 
@@ -40,14 +44,15 @@ export function ProjectsPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!canSubmit) return;
     setError('');
     setSuccess('');
     setCreating(true);
     try {
-      const res = await api.createProject({ name: name.trim() });
+      const res = await api.createProject({ name: name.trim(), projectCode });
       setSuccess(`Proyek "${res.project.name}" berhasil dibuat.`);
       setName('');
+      setProjectCode('');
       setShowForm(false);
       await loadProjects();
     } catch (err) {
@@ -95,8 +100,21 @@ export function ProjectsPage() {
               placeholder="cth: Gedung Parkir Pasar Baru"
               required
             />
+            <Field
+              id="projectCode"
+              label="Kode Proyek"
+              value={projectCode}
+              onChange={(v) => setProjectCode(v.toUpperCase())}
+              placeholder="cth: GPPB-001"
+              required
+            />
+            {projectCode && !codeValid && (
+              <p className="-mt-2 text-xs text-rose-500">
+                Kode hanya huruf besar, angka, atau tanda hubung, 3–20 karakter.
+              </p>
+            )}
             <div className="flex gap-2">
-              <button type="submit" disabled={creating || !name.trim()} className="btn-primary">
+              <button type="submit" disabled={!canSubmit} className="btn-primary">
                 {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                 Buat Proyek
               </button>

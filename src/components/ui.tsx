@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { hexWithAlpha } from '@/lib/categoryColors';
 
 type BadgeProps = {
   status: 'pending' | 'approved' | 'rejected';
@@ -38,6 +39,22 @@ export function Logo({ className = '' }: { className?: string }) {
         <p className="text-[11px] font-medium text-gray-400 dark:text-slate-500">ERP Permit System</p>
       </div>
     </div>
+  );
+}
+
+/** Permit category pill — inline colors because Tailwind can't do dynamic classes. */
+export function CategoryBadge({ name, color }: { name: string; color: string }) {
+  return (
+    <span
+      className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset"
+      style={{
+        color,
+        backgroundColor: hexWithAlpha(color, 0.08),
+        boxShadow: `inset 0 0 0 1px ${hexWithAlpha(color, 0.25)}`,
+      }}
+    >
+      {name}
+    </span>
   );
 }
 

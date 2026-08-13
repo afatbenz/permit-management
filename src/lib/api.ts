@@ -139,6 +139,18 @@ export type InvitationCode = {
   createdAt: string;
 };
 
+// ---- Permit categories ----
+
+export type PermitCategory = {
+  id: string;
+  name: string;
+  color: string;
+  sortOrder: number;
+  scope: 'system' | 'organization' | 'project';
+  isDefault: boolean;
+  removable: boolean;
+};
+
 // ---- Org settings ----
 
 export type UpdateOrganizationSettingsPayload = {
@@ -397,7 +409,12 @@ export const api = {
     return request<{ projects: Project[] }>('/api/v1/projects');
   },
 
-  async createProject(payload: { name: string }): Promise<CreateProjectResponse> {
+  /** Projects the signed-in user is actively assigned to (any role). */
+  async listMyProjects(): Promise<{ projects: Project[] }> {
+    return request<{ projects: Project[] }>('/api/v1/projects/mine');
+  },
+
+  async createProject(payload: { name: string; projectCode: string }): Promise<CreateProjectResponse> {
     return request<CreateProjectResponse>('/api/v1/projects', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -572,5 +589,39 @@ export const api = {
   ): Promise<{ evidences: EvidenceItem[] }> {
     const q = evidenceType ? `?evidenceType=${evidenceType}` : '';
     return request<{ evidences: EvidenceItem[] }>(`/api/v1/permits/${permitId}/evidences${q}`);
+  },
+
+  // ---- Permit categories ----
+
+  async listProjectCategories(projectId: string): Promise<{ categories: PermitCategory[] }> {
+    return request<{ categories: PermitCategory[] }>(`/api/v1/projects/${projectId}/categories`);
+  },
+
+  async createProjectCategory(
+    projectId: string,
+    payload: { name: string; color: string },
+  ): Promise<{ category: PermitCategory }> {
+    return request<{ category: PermitCategory }>(`/api/v1/projects/${projectId}/categories`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateProjectCategoryColor(
+    projectId: string,
+    categoryId: string,
+    color: string,
+  ): Promise<{ category: PermitCategory }> {
+    return request<{ category: PermitCategory }>(
+      `/api/v1/projects/${projectId}/categories/${categoryId}`,
+      { method: 'PATCH', body: JSON.stringify({ color }) },
+    );
+  },
+
+  async removeProjectCategory(projectId: string, categoryId: string): Promise<{ message: string }> {
+    return request<{ message: string }>(
+      `/api/v1/projects/${projectId}/categories/${categoryId}`,
+      { method: 'DELETE' },
+    );
   },
 };
