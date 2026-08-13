@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from 'react';
 import { ThemeProvider } from '@/lib/theme';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { RouterProvider, useRoute, useRouter } from '@/lib/router';
+import { useHasProject } from '@/lib/useHasProject';
 import { Spinner } from '@/components/ui';
 
 import { LoginPage } from '@/pages/LoginPage';
@@ -76,6 +77,8 @@ function Routes() {
   // project_admin (Project Category page).
   const isAdmin = user?.role?.code === 'org_admin' || user?.role?.code === 'super_admin';
   const isProjectAdmin = user?.role?.code === 'project_admin';
+  const { hasProject } = useHasProject(user?.id);
+
   const adminRoute = (page: ReactNode, includeProjectAdmin = false) => {
     if (!isAdmin && !(includeProjectAdmin && isProjectAdmin)) {
       navigate('/dashboard');
@@ -83,12 +86,28 @@ function Routes() {
     }
     return page;
   };
-  if (segments[0] === 'dashboard' && segments[1] === 'users') return adminRoute(<UsersManagementPage />);
-  if (segments[0] === 'dashboard' && segments[1] === 'settings') return adminRoute(<OrganizationSettingsPage />);
-  if (segments[0] === 'dashboard' && segments[1] === 'projects' && segments[2] === 'categories') {
-    return adminRoute(<ProjectCategoryPage />, true);
+  // Users / Organization / Project pages are project-scoped — an admin with
+  // no ACTIVE project assignment gets bounced to the dashboard (mirrors the
+  // sidebar hiding those menus).
+  const projectScopedRoute = (page: ReactNode) => {
+    if (!hasProject) {
+      navigate('/dashboard');
+      return null;
+    }
+    return page;
+  };
+  if (segments[0] === 'dashboard' && segments[1] === 'users') {
+    return projectScopedRoute(adminRoute(<UsersManagementPage />));
   }
-  if (segments[0] === 'dashboard' && segments[1] === 'projects') return adminRoute(<ProjectsPage />);
+  if (segments[0] === 'dashboard' && segments[1] === 'settings') {
+    return projectScopedRoute(adminRoute(<OrganizationSettingsPage />));
+  }
+  if (segments[0] === 'dashboard' && segments[1] === 'projects' && segments[2] === 'categories') {
+    return projectScopedRoute(adminRoute(<ProjectCategoryPage />, true));
+  }
+  if (segments[0] === 'dashboard' && segments[1] === 'projects') {
+    return projectScopedRoute(adminRoute(<ProjectsPage />));
+  }
   if (segments[0] === 'dashboard' && segments[1] === 'profile') return <ProfilePage />;
   if (segments[0] === 'dashboard' && segments[1] === 'permits' && segments[2] === 'new') return <NewPermitPage />;
   if (segments[0] === 'dashboard' && segments[1] === 'permits' && segments[2] === 'waiting') {
