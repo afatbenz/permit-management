@@ -1,6 +1,7 @@
 import { FileText, Clock, CheckCircle2, XCircle, TrendingUp, Plus, ArrowRight } from 'lucide-react';
 import { getPermits, type Permit } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
+import { useHasProject } from '@/lib/useHasProject';
 import { useRouter } from '@/lib/router';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { StatusBadge, EmptyState } from '@/components/ui';
@@ -8,6 +9,11 @@ import { StatusBadge, EmptyState } from '@/components/ui';
 export function HomePage() {
   const { user } = useAuth();
   const { navigate } = useRouter();
+
+  // Permits are project-bound, so a user without an ACTIVE project gets a
+  // neutral dashboard — no New Permit button, no stat cards, no Recent Permits.
+  const { hasProject } = useHasProject(user?.id);
+
   const permits: Permit[] = getPermits().slice(0, 5);
 
   const stats = {
@@ -37,24 +43,41 @@ export function HomePage() {
               <h1 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-3xl">{firstName} 👋</h1>
               <p className="mt-2 max-w-md text-sm text-brand-100">Here's what's happening with your permit applications today.</p>
             </div>
-            <button onClick={() => navigate('/dashboard/permits/new')} className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-brand-700 shadow-soft transition-all hover:bg-brand-50 active:scale-[0.98]">
-              <Plus className="h-4 w-4" /> New Permit
-            </button>
+            {hasProject && (
+              <button onClick={() => navigate('/dashboard/permits/new')} className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-brand-700 shadow-soft transition-all hover:bg-brand-50 active:scale-[0.98]">
+                <Plus className="h-4 w-4" /> New Permit
+              </button>
+            )}
           </div>
         </div>
 
         {/* Stat cards */}
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {STAT_CARDS.map((s) => (
-            <div key={s.label} className="card p-5">
-              <div className={`mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl ${s.tint}`}>{s.icon}</div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{s.value}</p>
-              <p className="text-sm text-gray-500 dark:text-slate-400">{s.label}</p>
+        {hasProject ? (
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {STAT_CARDS.map((s) => (
+              <div key={s.label} className="card p-5">
+                <div className={`mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl ${s.tint}`}>{s.icon}</div>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{s.value}</p>
+                <p className="text-sm text-gray-500 dark:text-slate-400">{s.label}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="card flex flex-col items-center gap-3 px-6 py-10 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-100 text-gray-400 dark:bg-slate-800 dark:text-slate-500">
+              <Clock className="h-6 w-6" />
             </div>
-          ))}
-        </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">Belum terikat ke proyek</p>
+              <p className="mx-auto mt-1 max-w-sm text-sm text-gray-500 dark:text-slate-400">
+                Fitur perizinan tersedia setelah Anda di-assign ke sebuah proyek dan disetujui admin organisasi.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Recent permits */}
+        {hasProject && (
         <div className="card">
           <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-slate-800">
             <div>
@@ -97,14 +120,17 @@ export function HomePage() {
             </div>
           )}
         </div>
+        )}
 
         {/* Activity tip */}
+        {hasProject && (
         <div className="flex items-center gap-3 rounded-2xl border border-brand-200 bg-brand-50/50 px-5 py-4 dark:border-brand-500/20 dark:bg-brand-500/5">
           <TrendingUp className="h-5 w-5 flex-shrink-0 text-brand-600 dark:text-brand-400" />
           <p className="text-sm text-brand-700 dark:text-brand-300">
             <span className="font-semibold">Tip:</span> Keep your contractor information up to date to speed up the approval process.
           </p>
         </div>
+        )}
       </div>
     </DashboardLayout>
   );

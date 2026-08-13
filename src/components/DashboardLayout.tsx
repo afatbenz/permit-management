@@ -19,6 +19,7 @@ import {
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from '@/lib/router';
+import { useHasProject } from '@/lib/useHasProject';
 import type { RoleCode } from '@/lib/api';
 import { Logo } from '@/components/ui';
 import { NotificationBell } from '@/components/NotificationBell';
@@ -30,12 +31,16 @@ type NavChild = {
   match: (segs: string[]) => boolean;
   adminOnly?: boolean;
   excludeRoles?: RoleCode[];
+  /** Requires at least one ACTIVE project assignment (hidden otherwise). */
+  needsProject?: boolean;
 };
 type NavGroup = {
   label: string;
   icon: ReactNode;
   /** 'admin' = org_admin || super_admin; 'adminOrProjectAdmin' also admits project_admin. */
   gate?: 'admin' | 'adminOrProjectAdmin';
+  /** Hide the whole group until the user has an ACTIVE project. */
+  needsProject?: boolean;
   children: NavChild[];
 };
 type NavEntry = { kind: 'item' } & NavChild | { kind: 'group' } & NavGroup;
@@ -52,12 +57,14 @@ const NAV: NavEntry[] = [
     kind: 'group',
     label: 'Permit Management',
     icon: <FileText className="h-5 w-5" />,
+    needsProject: true,
     children: [
       {
         label: 'All Request',
         icon: <FileText className="h-4 w-4" />,
         path: '/dashboard/permits',
         match: (s) => s[0] === 'dashboard' && s[1] === 'permits' && s.length === 2,
+        needsProject: true,
       },
       {
         label: 'Waiting Approval',
@@ -65,6 +72,7 @@ const NAV: NavEntry[] = [
         path: '/dashboard/permits/waiting',
         match: (s) => s[0] === 'dashboard' && s[1] === 'permits' && s[2] === 'waiting',
         excludeRoles: ['supervisor_subcon'],
+        needsProject: true,
       },
     ],
   },
@@ -137,18 +145,26 @@ export function DashboardLayout({ children, active }: { children: ReactNode; act
   const isAdmin = roleCode === 'org_admin' || roleCode === 'super_admin';
   const isProjectAdmin = roleCode === 'project_admin';
 
-  // Filter visible entries by role.
+  // Permit Management only makes sense once the user is bound to an ACTIVE
+  // project. Admins are auto-assigned to the project they create, so this is
+  // a real signal for every role (project-less accounts see Home + Settings).
+  const { hasProject } = useHasProject(user?.id);
+
+  // Filter visible entries by role + project binding.
   const visible = NAV.filter((entry) => {
     if (entry.kind === 'item') {
       if (entry.adminOnly && !isAdmin) return false;
       if (entry.excludeRoles?.includes(roleCode ?? 'unassigned')) return false;
+      if (entry.needsProject && !hasProject) return false;
       return true;
     }
     if (entry.gate === 'admin' && !isAdmin) return false;
     if (entry.gate === 'adminOrProjectAdmin' && !isAdmin && !isProjectAdmin) return false;
+    if (entry.needsProject && !hasProject) return false;
     const visibleChildren = entry.children.filter((c) => {
       if (c.adminOnly && !isAdmin) return false;
       if (c.excludeRoles?.includes(roleCode ?? 'unassigned')) return false;
+      if (c.needsProject && !hasProject) return false;
       return true;
     });
     return visibleChildren.length > 0;
