@@ -108,6 +108,7 @@ const NAV: NavEntry[] = [
         path: '/dashboard/users',
         match: (s) => s[0] === 'dashboard' && s[1] === 'users',
         adminOnly: true,
+        needsProject: true,
       },
       {
         label: 'Organization',
@@ -115,6 +116,7 @@ const NAV: NavEntry[] = [
         path: '/dashboard/settings',
         match: (s) => s[0] === 'dashboard' && s[1] === 'settings',
         adminOnly: true,
+        needsProject: true,
       },
       {
         label: 'Profile',
