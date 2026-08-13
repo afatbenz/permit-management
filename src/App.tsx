@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { ThemeProvider } from '@/lib/theme';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { RouterProvider, useRoute, useRouter } from '@/lib/router';
@@ -53,6 +53,14 @@ function Routes() {
     return <RegisterPage />;
   }
 
+  // An 'unassigned' account must complete onboarding before using the app.
+  // Done as an effect so a manual navigate() to /dashboard (e.g. an in-page
+  // "Ke Dashboard" button) is caught on the next render too, not only on
+  // initial load.
+  useEffect(() => {
+    if (isUnassigned) navigate('/onboarding');
+  }, [isUnassigned, navigate]);
+
   // Onboarding page is only for accounts that haven't picked an org yet.
   if (segments[0] === 'onboarding') {
     if (isUnassigned) return <OnboardingPage />;
@@ -60,11 +68,9 @@ function Routes() {
     return null;
   }
 
-  // An 'unassigned' account must complete onboarding before using the app.
-  if (isUnassigned) {
-    navigate('/onboarding');
-    return null;
-  }
+  // Unassigned accounts can't reach any dashboard page — render nothing while
+  // the effect above redirects to /onboarding (avoids a content flash).
+  if (isUnassigned) return null;
 
   // Admin-only dashboard pages — org_admin / super_admin. Some also admit
   // project_admin (Project Category page).

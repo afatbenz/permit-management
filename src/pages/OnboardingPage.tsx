@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Building2, UserPlus, CheckCircle2 } from 'lucide-react';
+import { Building2, UserPlus, CheckCircle2, Clock, LogOut } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { api, type Province, type City } from '@/lib/api';
 import { useRouter } from '@/lib/router';
@@ -9,7 +9,7 @@ import { Spinner } from '@/components/ui';
 type Mode = 'create' | 'join' | 'choose';
 
 export function OnboardingPage() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, signOut } = useAuth();
   const { navigate } = useRouter();
   const [mode, setMode] = useState<Mode>('choose');
 
@@ -126,14 +126,18 @@ export function OnboardingPage() {
               <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0" />
               {joinSuccess}
             </div>
+            <div className="flex items-start gap-3 rounded-xl bg-amber-50 px-4 py-4 text-sm text-amber-700 ring-1 ring-amber-600/10 dark:bg-amber-500/10 dark:text-amber-400">
+              <Clock className="mt-0.5 h-5 w-5 flex-shrink-0" />
+              Dashboard akan terbuka setelah admin organisasi menyetujui permintaan Anda.
+            </div>
             <button
               onClick={async () => {
-                await refreshUser();
-                navigate('/dashboard');
+                await signOut();
+                navigate('/login');
               }}
-              className="btn-primary w-full justify-center"
+              className="btn-ghost w-full justify-center"
             >
-              Ke Dashboard
+              <LogOut className="h-4 w-4" /> Keluar
             </button>
           </div>
         )}
