@@ -137,9 +137,6 @@ export function DashboardLayout({ children, active }: { children: ReactNode; act
   const isAdmin = roleCode === 'org_admin' || roleCode === 'super_admin';
   const isProjectAdmin = roleCode === 'project_admin';
 
-  const toggleGroup = (label: string, expanded: boolean) =>
-    setOpenGroups((prev) => ({ ...prev, [label]: expanded ?? !prev[label] }));
-
   // Filter visible entries by role.
   const visible = NAV.filter((entry) => {
     if (entry.kind === 'item') {
@@ -159,6 +156,12 @@ export function DashboardLayout({ children, active }: { children: ReactNode; act
 
   const childActive = (child: NavChild) => child.label === active;
   const groupActive = (group: NavGroup) => group.children.some((c) => childActive(c));
+
+  // Clicking a group header records the choice (open/collapsed) so later
+  // navigation within it doesn't re-open everything from the default state.
+  const handleToggleGroup = (label: string) => {
+    setOpenGroups((prev) => ({ ...prev, [label]: !(prev[label] ?? true) }));
+  };
 
   const handleNav = (path: string) => {
     navigate(path);
@@ -192,7 +195,7 @@ export function DashboardLayout({ children, active }: { children: ReactNode; act
     return (
       <div key={group.label}>
         <button
-          onClick={() => toggleGroup(group.label, !expanded)}
+          onClick={() => handleToggleGroup(group.label)}
           className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
             groupActive(group)
               ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300'
