@@ -2,6 +2,7 @@ import { ArrowLeft, Building2, MapPin, User, Calendar, FileText, CheckCircle2, X
 import { useState } from 'react';
 import { getPermit, deletePermit, approvePermit, rejectPermit, type Permit } from '@/lib/supabase';
 import { useProjectRoles } from '@/lib/useProjectRoles';
+import { useActiveProject } from '@/lib/activeProject';
 import { useRouter } from '@/lib/router';
 import { useAuth } from '@/lib/auth';
 import { DashboardLayout } from '@/components/DashboardLayout';
@@ -13,6 +14,11 @@ export function PermitDetailPage({ id }: { id: string }) {
   const { user } = useAuth();
   const [permit, setPermit] = useState<Permit | undefined>(() => getPermit(id));
   const projectRoles = useProjectRoles(user?.id);
+  // Members are scoped to their chosen project — a permit from another
+  // project is treated as not found.
+  const { activeProject, isMember } = useActiveProject();
+  const memberScopedOut =
+    isMember && permit?.project_id && permit.project_id !== activeProject?.id;
 
   const handleDelete = () => {
     if (!confirm('Are you sure you want to delete this permit? This cannot be undone.')) return;
@@ -21,8 +27,13 @@ export function PermitDetailPage({ id }: { id: string }) {
   };
 
   // Approve/reject is limited to the role the user holds in THIS permit's
-  // project (per-project role, not the global gate).
-  const permitProjectRole = permit?.project_id ? projectRoles.get(permit.project_id) : undefined;
+  // project (per-project role, not the global gate). For members that is the
+  // chosen project's role; admins resolve via the per-project role map.
+  const permitProjectRole = isMember
+    ? activeProject?.roleCode
+    : permit?.project_id
+      ? projectRoles.get(permit.project_id)
+      : undefined;
   const canAct = permit?.status === 'pending' && permit.current_approver_role === permitProjectRole;
 
   const handleApprove = () => {
@@ -39,7 +50,7 @@ export function PermitDetailPage({ id }: { id: string }) {
   const formatDateTime = (iso: string) =>
     new Date(iso).toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' });
 
-  if (!permit) {
+  if (!permit || memberScopedOut) {
     return (
       <DashboardLayout active="Permit Management">
         <div className="mx-auto max-w-3xl">

@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react';
 import { ThemeProvider } from '@/lib/theme';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { ActiveProjectProvider, useActiveProject } from '@/lib/activeProject';
 import { RouterProvider, useRoute, useRouter } from '@/lib/router';
 import { useHasProject } from '@/lib/useHasProject';
 import { Spinner } from '@/components/ui';
@@ -8,6 +9,7 @@ import { Spinner } from '@/components/ui';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { OnboardingPage } from '@/pages/OnboardingPage';
+import { SelectProjectPage } from '@/pages/SelectProjectPage';
 import { HomePage } from '@/pages/HomePage';
 import { PermitManagementPage } from '@/pages/PermitManagementPage';
 import { NewPermitPage } from '@/pages/NewPermitPage';
@@ -73,6 +75,24 @@ function Routes() {
   // the effect above redirects to /onboarding (avoids a content flash).
   if (isUnassigned) return null;
 
+  // Non-admins work inside a single chosen project (session scoping).
+  // Called before the picker routing below (hooks must not be gated).
+  const { activeProject, isMember } = useActiveProject();
+
+  // Non-admins work inside a chosen project: they pick one right after login,
+  // and the picker is always reachable (header "ganti project") to switch.
+  if (segments[0] === 'select-project') {
+    if (!isMember) {
+      navigate('/dashboard');
+      return null;
+    }
+    return <SelectProjectPage />;
+  }
+  if (isMember && !activeProject) {
+    navigate('/select-project');
+    return null;
+  }
+
   // Admin-only dashboard pages — org_admin / super_admin. Some also admit
   // project_admin (Project Category page).
   const isAdmin = user?.role?.code === 'org_admin' || user?.role?.code === 'super_admin';
@@ -125,7 +145,9 @@ function App() {
     <ThemeProvider>
       <RouterProvider>
         <AuthProvider>
-          <Routes />
+          <ActiveProjectProvider>
+            <Routes />
+          </ActiveProjectProvider>
         </AuthProvider>
       </RouterProvider>
     </ThemeProvider>

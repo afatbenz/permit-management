@@ -1,6 +1,7 @@
 import { FileText, Clock, CheckCircle2, XCircle, TrendingUp, Plus, ArrowRight } from 'lucide-react';
 import { getPermits, type Permit } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
+import { useActiveProject } from '@/lib/activeProject';
 import { useHasProject } from '@/lib/useHasProject';
 import { useRouter } from '@/lib/router';
 import { DashboardLayout } from '@/components/DashboardLayout';
@@ -12,16 +13,21 @@ export function HomePage() {
 
   // Permits are project-bound, so a user without an ACTIVE project gets a
   // neutral dashboard — no New Permit button, no stat cards, no Recent Permits.
+  // Members are scoped to their chosen project; admins see everything.
   const { hasProject } = useHasProject(user?.id);
+  const { activeProject, isMember } = useActiveProject();
+  const scopedProjectId = isMember ? activeProject?.id : undefined;
 
-  const permits: Permit[] = getPermits().slice(0, 5);
+  const permits: Permit[] = getPermits(scopedProjectId).slice(0, 5);
 
   const stats = {
-    total: getPermits().length,
-    pending: getPermits().filter((p) => p.status === 'pending').length,
-    approved: getPermits().filter((p) => p.status === 'approved').length,
-    rejected: getPermits().filter((p) => p.status === 'rejected').length,
+    total: getPermits(scopedProjectId).length,
+    pending: getPermits(scopedProjectId).filter((p) => p.status === 'pending').length,
+    approved: getPermits(scopedProjectId).filter((p) => p.status === 'approved').length,
+    rejected: getPermits(scopedProjectId).filter((p) => p.status === 'rejected').length,
   };
+
+  const hasAccessibleProject = isMember ? !!activeProject : hasProject;
 
   const firstName = (user?.name ?? '').split(' ')[0] || 'Pengguna';
 
@@ -43,7 +49,7 @@ export function HomePage() {
               <h1 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-3xl">{firstName} 👋</h1>
               <p className="mt-2 max-w-md text-sm text-brand-100">Here's what's happening with your permit applications today.</p>
             </div>
-            {hasProject && (
+            {hasAccessibleProject && (
               <button onClick={() => navigate('/dashboard/permits/new')} className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-brand-700 shadow-soft transition-all hover:bg-brand-50 active:scale-[0.98]">
                 <Plus className="h-4 w-4" /> New Permit
               </button>
@@ -52,7 +58,7 @@ export function HomePage() {
         </div>
 
         {/* Stat cards */}
-        {hasProject ? (
+        {hasAccessibleProject ? (
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {STAT_CARDS.map((s) => (
               <div key={s.label} className="card p-5">
@@ -77,7 +83,7 @@ export function HomePage() {
         )}
 
         {/* Recent permits */}
-        {hasProject && (
+        {hasAccessibleProject && (
         <div className="card">
           <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-slate-800">
             <div>
@@ -123,7 +129,7 @@ export function HomePage() {
         )}
 
         {/* Activity tip */}
-        {hasProject && (
+        {hasAccessibleProject && (
         <div className="flex items-center gap-3 rounded-2xl border border-brand-200 bg-brand-50/50 px-5 py-4 dark:border-brand-500/20 dark:bg-brand-500/5">
           <TrendingUp className="h-5 w-5 flex-shrink-0 text-brand-600 dark:text-brand-400" />
           <p className="text-sm text-brand-700 dark:text-brand-300">

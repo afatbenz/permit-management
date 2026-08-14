@@ -124,9 +124,10 @@ type FieldProps = {
   type?: string;
   id?: string;
   icon?: ReactNode;
+  disabled?: boolean;
 };
 
-export function Field({ label, value, onChange, placeholder, required, type = 'text', id, icon }: FieldProps) {
+export function Field({ label, value, onChange, placeholder, required, type = 'text', id, icon, disabled }: FieldProps) {
   return (
     <div>
       <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">
@@ -145,6 +146,7 @@ export function Field({ label, value, onChange, placeholder, required, type = 't
           style={icon ? { paddingLeft: '2.5rem' } : undefined}
           value={value}
           placeholder={placeholder}
+          disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
         />
       </div>

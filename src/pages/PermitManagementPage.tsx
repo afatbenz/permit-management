@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Plus, Search, FileText, Eye, ChevronLeft, ChevronRight, Filter, Clock } from 'lucide-react';
 import { getPermits, type Permit } from '@/lib/supabase';
 import { useProjectRoles } from '@/lib/useProjectRoles';
+import { useActiveProject } from '@/lib/activeProject';
 import { useRouter } from '@/lib/router';
 import { useAuth } from '@/lib/auth';
+import { api, type Project } from '@/lib/api';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { StatusBadge, CategoryBadge, EmptyState } from '@/components/ui';
 
@@ -17,7 +19,19 @@ export function PermitManagementPage({ filter = 'all' }: { filter?: 'all' | 'wai
   const [page, setPage] = useState(1);
 
   const isWaiting = filter === 'waiting';
-  const permits = getPermits();
+  // Members work inside their chosen project; admins see everything and can
+  // narrow by project via a filter dropdown.
+  const { activeProject, isMember } = useActiveProject();
+  const [adminProjects, setAdminProjects] = useState<Project[]>([]);
+  const [projectFilter, setProjectFilter] = useState('');
+
+  useEffect(() => {
+    if (isMember) return;
+    api.listProjects().then((res) => setAdminProjects(res.projects)).catch(() => {});
+  }, [isMember]);
+
+  const scopedProjectId = isMember ? activeProject?.id : projectFilter || undefined;
+  const permits = getPermits(scopedProjectId);
   // Role the user holds *within each project* — the approval pipeline resolves
   // each permit against this, since a user can be a different role per project.
   const projectRoles = useProjectRoles(user?.id);
@@ -27,7 +41,11 @@ export function PermitManagementPage({ filter = 'all' }: { filter?: 'all' | 'wai
       // Waiting Approval = pending and the permit is at the role the user
       // holds in THAT permit's project.
       if (isWaiting) {
-        const projectRole = p.project_id ? projectRoles.get(p.project_id) : undefined;
+        const projectRole = isMember
+          ? activeProject?.roleCode
+          : p.project_id
+            ? projectRoles.get(p.project_id)
+            : undefined;
         return p.status === 'pending' && p.current_approver_role === projectRole;
       }
       const q = search.toLowerCase();
@@ -41,7 +59,7 @@ export function PermitManagementPage({ filter = 'all' }: { filter?: 'all' | 'wai
       const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
-  }, [permits, search, statusFilter, isWaiting, projectRoles]);
+  }, [permits, search, statusFilter, isWaiting, projectRoles, isMember, activeProject?.roleCode]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -92,7 +110,20 @@ export function PermitManagementPage({ filter = 'all' }: { filter?: 'all' | 'wai
                 Menunggu tindakan Anda
               </div>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {!isMember && adminProjects.length > 0 && (
+                  <select
+                    value={projectFilter}
+                    onChange={(e) => { setProjectFilter(e.target.value); setPage(1); }}
+                    className="input-field !w-auto !py-1.5 text-xs"
+                    aria-label="Filter project"
+                  >
+                    <option value="">Semua Project</option>
+                    {adminProjects.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                )}
                 <Filter className="h-4 w-4 text-gray-400 dark:text-slate-500" />
                 {(['all', 'pending', 'approved', 'rejected'] as const).map((s) => (
                   <button

@@ -118,8 +118,15 @@ let permits: Permit[] = [...SEED];
 
 // ── CRUD helpers (mirror Supabase query style) ───────────────
 
-export function getPermits(): Permit[] {
-  return [...permits].sort((a, b) => b.created_at.localeCompare(a.created_at));
+/**
+ * All permits, newest first. Pass a `projectId` to scope to that project
+ * (non-admin "active project" session). Without it, returns every permit
+ * (admin org-wide view; seed permits carry `project_id: null` and only show
+ * here).
+ */
+export function getPermits(projectId?: string): Permit[] {
+  const all = [...permits].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  return projectId ? all.filter((p) => p.project_id === projectId) : all;
 }
 
 export function getPermit(id: string): Permit | undefined {

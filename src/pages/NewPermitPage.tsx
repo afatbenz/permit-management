@@ -3,6 +3,7 @@ import { ArrowLeft, Save, Building2, Map, Wrench, Trash2, FileUp } from 'lucide-
 import { addPermit, type PermitInput } from '@/lib/supabase';
 import { api, type EvidenceType, type PermitCategory, type Project } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { useActiveProject } from '@/lib/activeProject';
 import { useRouter } from '@/lib/router';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Field, SuggestionInput, SelectField } from '@/components/Field';
@@ -59,7 +60,8 @@ function validateEvidenceFile(file: File): string | null {
 export function NewPermitPage() {
   const { user } = useAuth();
   const { navigate } = useRouter();
-  const [form, setForm] = useState<PermitInput>({
+  const { activeProject, isMember } = useActiveProject();
+  const [form, setForm] = useState<PermitInput>(() => ({
     department: '',
     contractor_name: '',
     address_1: '',
@@ -67,35 +69,35 @@ export function NewPermitPage() {
     city: '',
     province: '',
     project: '',
-  });
+    ...(isMember && activeProject
+      ? { project_id: activeProject.id, project: activeProject.name }
+      : {}),
+  }));
   const [evidence, setEvidence] = useState<PendingEvidence[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [projects, setProjects] = useState<Project[]>([]);
   const [categories, setCategories] = useState<PermitCategory[]>(FALLBACK_CATEGORIES);
-  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [selectedProjectId, setSelectedProjectId] = useState(
+    isMember && activeProject ? activeProject.id : '',
+  );
 
   const siteMapRef = useRef<HTMLInputElement>(null);
   const equipmentRef = useRef<HTMLInputElement>(null);
 
-  // Load the caller's projects. spv_subcon has no admin listProjects, so fall
-  // back to "my projects"; if even that fails, the project field just stays a
-  // free-text input.
+  // Members are locked to their chosen project — no fetch needed.
+  // Admins load the org's projects for the project dropdown.
   useEffect(() => {
+    if (isMember) return;
     (async () => {
       try {
-        const res = await api.listMyProjects();
-        if (res.projects.length > 0) {
-          setProjects(res.projects);
-          return;
-        }
         const all = await api.listProjects();
         setProjects(all.projects);
       } catch {
         /* keep projects empty → fallback text input */
       }
     })();
-  }, []);
+  }, [isMember]);
 
   // Categories follow the selected project; reset when it changes.
   useEffect(() => {
@@ -203,7 +205,17 @@ export function NewPermitPage() {
               <Building2 className="h-4 w-4 text-brand-600 dark:text-brand-400" />
               <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">Project Information</h2>
             </div>
-            {projects.length > 0 ? (
+            {isMember && activeProject ? (
+              <Field
+                id="project"
+                label="Nama Project"
+                value={activeProject.name}
+                onChange={() => {}}
+                placeholder=""
+                disabled
+                required
+              />
+            ) : projects.length > 0 ? (
               <SelectField
                 id="project"
                 label="Nama Project"

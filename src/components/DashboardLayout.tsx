@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
+import { useActiveProject } from '@/lib/activeProject';
 import { useRouter } from '@/lib/router';
 import { useHasProject } from '@/lib/useHasProject';
 import type { RoleCode } from '@/lib/api';
@@ -151,22 +152,25 @@ export function DashboardLayout({ children, active }: { children: ReactNode; act
   // project. Admins are auto-assigned to the project they create, so this is
   // a real signal for every role (project-less accounts see Home + Settings).
   const { hasProject } = useHasProject(user?.id);
+  // Members are project-scoped by session: nav gates on the chosen project.
+  const { activeProject, isMember } = useActiveProject();
+  const hasAccessibleProject = isMember ? !!activeProject : hasProject;
 
   // Filter visible entries by role + project binding.
   const visible = NAV.filter((entry) => {
     if (entry.kind === 'item') {
       if (entry.adminOnly && !isAdmin) return false;
       if (entry.excludeRoles?.includes(roleCode ?? 'unassigned')) return false;
-      if (entry.needsProject && !hasProject) return false;
+      if (entry.needsProject && !hasAccessibleProject) return false;
       return true;
     }
     if (entry.gate === 'admin' && !isAdmin) return false;
     if (entry.gate === 'adminOrProjectAdmin' && !isAdmin && !isProjectAdmin) return false;
-    if (entry.needsProject && !hasProject) return false;
+    if (entry.needsProject && !hasAccessibleProject) return false;
     const visibleChildren = entry.children.filter((c) => {
       if (c.adminOnly && !isAdmin) return false;
       if (c.excludeRoles?.includes(roleCode ?? 'unassigned')) return false;
-      if (c.needsProject && !hasProject) return false;
+      if (c.needsProject && !hasAccessibleProject) return false;
       return true;
     });
     return visibleChildren.length > 0;
@@ -295,6 +299,17 @@ export function DashboardLayout({ children, active }: { children: ReactNode; act
             />
           </div>
           <div className="flex flex-1 items-center justify-end gap-2 sm:flex-none">
+            {isMember && activeProject && (
+              <button
+                onClick={() => navigate('/select-project')}
+                className="hidden items-center gap-1.5 rounded-xl border border-brand-200 bg-brand-50/60 px-3 py-2 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-50 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300 sm:inline-flex"
+                title="Ganti project aktif"
+              >
+                <FolderKanban className="h-3.5 w-3.5" />
+                <span className="max-w-[180px] truncate">{activeProject.name}</span>
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+            )}
             <button onClick={toggle} className="rounded-xl p-2.5 text-gray-500 transition-colors hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-800" aria-label="Toggle theme">
               {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </button>
