@@ -18,6 +18,7 @@ import { UsersManagementPage } from '@/pages/UsersManagementPage';
 import { OrganizationSettingsPage } from '@/pages/OrganizationSettingsPage';
 import { ProjectsPage } from '@/pages/ProjectsPage';
 import { ProjectCategoryPage } from '@/pages/ProjectCategoryPage';
+import { BankQuestionPage } from '@/pages/BankQuestionPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 
 function Routes() {
@@ -126,6 +127,9 @@ function Routes() {
   }
   if (segments[0] === 'dashboard' && segments[1] === 'settings') {
     return projectScopedRoute(adminRoute(<OrganizationSettingsPage />));
+  }
+  if (segments[0] === 'dashboard' && segments[1] === 'projects' && segments[2] === 'bank-questions') {
+    return projectScopedRoute(adminRoute(<BankQuestionPage />, true));
   }
   if (segments[0] === 'dashboard' && segments[1] === 'projects' && segments[2] === 'categories') {
     return projectScopedRoute(adminRoute(<ProjectCategoryPage />, true));

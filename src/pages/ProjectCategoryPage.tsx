@@ -133,7 +133,7 @@ export function ProjectCategoryPage() {
     <DashboardLayout active="Project Category">
       <div className="space-y-5">
         <div>
-          <h1 className="text-xl font-extrabold tracking-tight text-gray-900 dark:text-white">Bank Question</h1>
+          <h1 className="text-xl font-extrabold tracking-tight text-gray-900 dark:text-white">Project Category</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
             Kelola kategori permit dan warna dokumen per proyek
           </p>

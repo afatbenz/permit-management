@@ -155,6 +155,26 @@ export type PermitCategory = {
   removable: boolean;
 };
 
+// ---- Bank questions (checklist per permit category) ----
+
+export type BankQuestion = {
+  id: string;
+  categoryId: string;
+  categoryName: string | null;
+  categoryColor: string | null;
+  questionEn: string;
+  questionId: string;
+  sortOrder: number;
+  canMutate: boolean;
+};
+
+export type BankQuestionInput = {
+  categoryId: string;
+  questionEn: string;
+  questionId: string;
+  sortOrder?: number;
+};
+
 // ---- Org settings ----
 
 export type UpdateOrganizationSettingsPayload = {
@@ -636,6 +656,46 @@ export const api = {
   async removeProjectCategory(projectId: string, categoryId: string): Promise<{ message: string }> {
     return request<{ message: string }>(
       `/api/v1/projects/${projectId}/categories/${categoryId}`,
+      { method: 'DELETE' },
+    );
+  },
+
+  // ---- Bank questions (checklist per permit category) ----
+
+  async listBankQuestions(projectId: string): Promise<{
+    projectId: string;
+    questions: BankQuestion[];
+  }> {
+    return request(`/api/v1/projects/${projectId}/bank-questions`);
+  },
+
+  async createBankQuestion(
+    projectId: string,
+    payload: BankQuestionInput,
+  ): Promise<{ question: BankQuestion }> {
+    return request<{ question: BankQuestion }>(
+      `/api/v1/projects/${projectId}/bank-questions`,
+      { method: 'POST', body: JSON.stringify(payload) },
+    );
+  },
+
+  async updateBankQuestion(
+    projectId: string,
+    questionId: string,
+    payload: Partial<BankQuestionInput>,
+  ): Promise<{ question: BankQuestion }> {
+    return request<{ question: BankQuestion }>(
+      `/api/v1/projects/${projectId}/bank-questions/${questionId}`,
+      { method: 'PATCH', body: JSON.stringify(payload) },
+    );
+  },
+
+  async removeBankQuestion(
+    projectId: string,
+    questionId: string,
+  ): Promise<{ message: string; questionId: string }> {
+    return request<{ message: string; questionId: string }>(
+      `/api/v1/projects/${projectId}/bank-questions/${questionId}`,
       { method: 'DELETE' },
     );
   },

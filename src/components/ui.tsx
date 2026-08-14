@@ -29,9 +29,14 @@ export function StatusBadge({ status }: BadgeProps) {
 export function Logo({ className = '' }: { className?: string }) {
   return (
     <div className={`flex items-center gap-2.5 ${className}`}>
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-white shadow-soft">
+      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white shadow-soft">
         <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth={2.2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M9 12h6M9 16h6M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"
+          />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M14 3v5h5" />
         </svg>
       </div>
       <div className="leading-tight">

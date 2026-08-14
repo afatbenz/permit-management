@@ -246,7 +246,7 @@ function ProjectRoleDialog({
                   type="button"
                   onClick={addRow}
                   disabled={!nextProject || !nextRole}
-                  className="rounded-lg bg-brand-600 p-1.5 text-white hover:bg-brand-700 disabled:opacity-40"
+                  className="rounded-lg bg-blue-600 p-1.5 text-white hover:bg-blue-700 disabled:opacity-40"
                   aria-label="Tambahkan"
                 >
                   <Plus className="h-4 w-4" />
@@ -286,7 +286,7 @@ function ProjectRoleDialog({
             type="button"
             onClick={save}
             disabled={rows.length === 0}
-            className="inline-flex items-center gap-1 rounded-xl bg-brand-600 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-brand-700 disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-blue-700 disabled:opacity-50"
           >
             <Pencil className="h-3.5 w-3.5" /> Simpan
           </button>
