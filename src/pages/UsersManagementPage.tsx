@@ -44,8 +44,9 @@ function RoleChip({ roleCode, roleName }: { roleCode: string | null; roleName: s
 }
 
 /** Per-user project & role assignment dialog (org-admin view).
- *  Left column lists the user's current projects with their per-project role;
- *  the right editor adds/removes/re-roles assignments, saved in one shot. */
+ *  A table of the user's projects: Nama Project + Role select (current role
+ *  pre-selected) + remove. A "Tambah Project" row at the bottom picks a new
+ *  project and its role. Saved in one shot via onSave. */
 function ProjectRoleDialog({
   user,
   projects,
@@ -61,7 +62,6 @@ function ProjectRoleDialog({
 }) {
   // Each row: { projectId, roleId }. Default role is the first assignable one.
   const defaultRoleId = roles[0]?.id ?? '';
-  const active = user.assignments.filter((a) => a.status === 'active');
   const rowFrom = (a: AdminUser['assignments'][number]) => ({
     projectId: a.projectId,
     roleId: a.roleId || defaultRoleId,
@@ -105,7 +105,7 @@ function ProjectRoleDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-gray-200 dark:bg-slate-900 dark:ring-slate-700">
+      <div className="relative w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-gray-200 dark:bg-slate-900 dark:ring-slate-700">
         {/* Header */}
         <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-6 py-4 dark:border-slate-800">
           <div>
@@ -124,106 +124,102 @@ function ProjectRoleDialog({
           </button>
         </div>
 
-        <div className="grid gap-6 px-6 py-5 sm:grid-cols-2">
-          {/* Left: current assignments (read-only summary) */}
-          <div>
-            <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">
-              Proyek saat ini
-            </h3>
-            {active.length === 0 ? (
-              <p className="text-sm text-gray-400 dark:text-slate-500">Belum ada proyek.</p>
-            ) : (
-              <ul className="space-y-2">
-                {active.map((a) => (
-                  <li
-                    key={a.projectId}
-                    className="flex items-center justify-between gap-2 rounded-xl bg-gray-50 px-3 py-2 text-sm dark:bg-slate-800/40"
-                  >
-                    <span className="min-w-0 truncate font-medium text-gray-800 dark:text-slate-200">
-                      {a.projectName ?? '—'}
-                    </span>
-                    <span className="inline-flex flex-shrink-0 items-center rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
-                      {roleLabel(a.roleId)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+        {/* Assignment table */}
+        <div className="px-6 py-5">
+          {rows.length === 0 ? (
+            <p className="text-sm text-gray-400 dark:text-slate-500">Belum ada proyek.</p>
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-slate-700">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50/50 text-xs uppercase tracking-wider text-gray-500 dark:border-slate-800 dark:bg-slate-800/30 dark:text-slate-400">
+                    <th className="px-4 py-2.5 font-semibold">Nama Project</th>
+                    <th className="px-4 py-2.5 font-semibold">Role</th>
+                    <th className="w-10 px-2 py-2.5" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                  {rows.map((row, i) => {
+                    // Auto-fill the row's role with the user's current
+                    // per-project role for that project (if any).
+                    const currentForProject = user.assignments.find((a) => a.projectId === row.projectId);
+                    const effectiveRoleId = row.roleId || currentForProject?.roleId || defaultRoleId;
+                    return (
+                      <tr key={row.projectId || `row-${i}`} className="hover:bg-gray-50 dark:hover:bg-slate-800/40">
+                        <td className="px-4 py-2">
+                          <span className="font-medium text-gray-800 dark:text-slate-200">
+                            {projects.find((p) => p.id === row.projectId)?.name ??
+                              user.assignments.find((a) => a.projectId === row.projectId)?.projectName ??
+                              '—'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2">
+                          <select
+                            value={effectiveRoleId}
+                            onChange={(e) => updateRow(i, { roleId: e.target.value })}
+                            className="input-field !py-1.5 text-xs"
+                          >
+                            <option value={effectiveRoleId}>{roleLabel(effectiveRoleId)}</option>
+                            {roles
+                              .filter((r) => r.id !== effectiveRoleId)
+                              .map((r) => (
+                                <option key={r.id} value={r.id}>
+                                  {r.name}
+                                </option>
+                              ))}
+                          </select>
+                        </td>
+                        <td className="px-2 py-2">
+                          <button
+                            type="button"
+                            onClick={() => removeRow(i)}
+                            className="rounded-lg p-1.5 text-gray-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
+                            aria-label="Hapus assignment"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-          {/* Right: assignment editor */}
-          <div className="space-y-2">
-            <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">
-              Atur assignment
-            </h3>
-            {rows.map((row, i) => {
-              const currentForProject = user.assignments.find((a) => a.projectId === row.projectId);
-              const effectiveRoleId = row.roleId || currentForProject?.roleId || defaultRoleId;
-              return (
-                <div key={row.projectId || `row-${i}`} className="flex items-center gap-2">
+          {/* Add-project row */}
+          <div className="mt-3">
+            {showAdd ? (
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <label className="mb-1 block text-[11px] font-medium text-gray-500 dark:text-slate-400">Nama Project</label>
                   <select
-                    value={row.projectId}
-                    onChange={(e) => updateRow(i, { projectId: e.target.value })}
+                    value={nextProject}
+                    onChange={(e) => setNextProject(e.target.value)}
                     className="input-field !py-1.5 text-xs"
                   >
-                    {!row.projectId && <option value="">Pilih proyek</option>}
-                    {projects.map((p) => (
+                    <option value="">Pilih proyek</option>
+                    {availableProjects.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}
                       </option>
                     ))}
                   </select>
+                </div>
+                <div className="flex-1">
+                  <label className="mb-1 block text-[11px] font-medium text-gray-500 dark:text-slate-400">Role</label>
                   <select
-                    value={effectiveRoleId}
-                    onChange={(e) => updateRow(i, { roleId: e.target.value })}
+                    value={nextRole}
+                    onChange={(e) => setNextRole(e.target.value)}
                     className="input-field !py-1.5 text-xs"
                   >
-                    <option value={effectiveRoleId}>{roleLabel(effectiveRoleId)}</option>
-                    {roles
-                      .filter((r) => r.id !== effectiveRoleId)
-                      .map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.name}
-                        </option>
-                      ))}
+                    {roles.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                      </option>
+                    ))}
                   </select>
-                  <button
-                    type="button"
-                    onClick={() => removeRow(i)}
-                    className="rounded-lg p-1.5 text-gray-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
-                    aria-label="Hapus assignment"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
                 </div>
-              );
-            })}
-
-            {showAdd ? (
-              <div className="flex items-center gap-2">
-                <select
-                  value={nextProject}
-                  onChange={(e) => setNextProject(e.target.value)}
-                  className="input-field !py-1.5 text-xs"
-                >
-                  <option value="">Pilih proyek</option>
-                  {availableProjects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={nextRole}
-                  onChange={(e) => setNextRole(e.target.value)}
-                  className="input-field !py-1.5 text-xs"
-                >
-                  {roles.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
                 <button
                   type="button"
                   onClick={addRow}
@@ -249,7 +245,7 @@ function ProjectRoleDialog({
                 disabled={availableProjects.length === 0}
                 className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700 disabled:opacity-40 dark:text-brand-400"
               >
-                <Plus className="h-3.5 w-3.5" /> Tambah proyek
+                <Plus className="h-3.5 w-3.5" /> Tambah Project
               </button>
             )}
           </div>
