@@ -1,6 +1,7 @@
 import { ArrowLeft, Building2, MapPin, User, Calendar, FileText, CheckCircle2, XCircle, Clock, Trash2, ArrowRight, Tag, Check, Ban } from 'lucide-react';
 import { useState } from 'react';
 import { getPermit, deletePermit, approvePermit, rejectPermit, type Permit } from '@/lib/supabase';
+import { useProjectRoles } from '@/lib/useProjectRoles';
 import { useRouter } from '@/lib/router';
 import { useAuth } from '@/lib/auth';
 import { DashboardLayout } from '@/components/DashboardLayout';
@@ -11,6 +12,7 @@ export function PermitDetailPage({ id }: { id: string }) {
   const { navigate } = useRouter();
   const { user } = useAuth();
   const [permit, setPermit] = useState<Permit | undefined>(() => getPermit(id));
+  const projectRoles = useProjectRoles(user?.id);
 
   const handleDelete = () => {
     if (!confirm('Are you sure you want to delete this permit? This cannot be undone.')) return;
@@ -18,7 +20,10 @@ export function PermitDetailPage({ id }: { id: string }) {
     navigate('/dashboard/permits');
   };
 
-  const canAct = permit?.status === 'pending' && permit.current_approver_role === user?.role?.code;
+  // Approve/reject is limited to the role the user holds in THIS permit's
+  // project (per-project role, not the global gate).
+  const permitProjectRole = permit?.project_id ? projectRoles.get(permit.project_id) : undefined;
+  const canAct = permit?.status === 'pending' && permit.current_approver_role === permitProjectRole;
 
   const handleApprove = () => {
     const updated = approvePermit(id);

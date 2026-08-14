@@ -18,6 +18,8 @@ export type Permit = {
   city: string;
   province: string;
   project: string;
+  /** Project this permit belongs to (resolves the per-project approver role). */
+  project_id: string | null;
   status: 'pending' | 'approved' | 'rejected';
   /** Category this permit belongs to (one per permit). */
   category_id: string | null;
@@ -71,6 +73,7 @@ function createPermit(input: PermitInput, userEmail: string): Permit {
     city: input.city,
     province: input.province,
     project: input.project,
+    project_id: input.project_id ?? null,
     status: 'pending',
     category_id: input.category_id ?? null,
     category_name: input.category_name ?? null,

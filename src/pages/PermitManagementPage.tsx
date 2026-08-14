@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Plus, Search, FileText, Eye, ChevronLeft, ChevronRight, Filter, Clock } from 'lucide-react';
 import { getPermits, type Permit } from '@/lib/supabase';
+import { useProjectRoles } from '@/lib/useProjectRoles';
 import { useRouter } from '@/lib/router';
 import { useAuth } from '@/lib/auth';
 import { DashboardLayout } from '@/components/DashboardLayout';
@@ -16,14 +17,18 @@ export function PermitManagementPage({ filter = 'all' }: { filter?: 'all' | 'wai
   const [page, setPage] = useState(1);
 
   const isWaiting = filter === 'waiting';
-  const roleCode = user?.role?.code ?? 'unassigned';
   const permits = getPermits();
+  // Role the user holds *within each project* — the approval pipeline resolves
+  // each permit against this, since a user can be a different role per project.
+  const projectRoles = useProjectRoles(user?.id);
 
   const filtered = useMemo(() => {
     return permits.filter((p) => {
-      // Waiting Approval = pending and the permit is at MY role's step.
+      // Waiting Approval = pending and the permit is at the role the user
+      // holds in THAT permit's project.
       if (isWaiting) {
-        return p.status === 'pending' && p.current_approver_role === roleCode;
+        const projectRole = p.project_id ? projectRoles.get(p.project_id) : undefined;
+        return p.status === 'pending' && p.current_approver_role === projectRole;
       }
       const q = search.toLowerCase();
       const matchesSearch =
@@ -36,7 +41,7 @@ export function PermitManagementPage({ filter = 'all' }: { filter?: 'all' | 'wai
       const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
-  }, [permits, search, statusFilter, isWaiting, roleCode]);
+  }, [permits, search, statusFilter, isWaiting, projectRoles]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);

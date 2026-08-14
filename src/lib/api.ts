@@ -108,6 +108,10 @@ export type Project = {
   updatedAt: string;
   /** Active invitation code for the project (listProjects only). */
   invitationCode?: string | null;
+  /** Role the signed-in user holds within this project (listMyProjects only). */
+  roleId?: string | null;
+  roleCode?: RoleCode | null;
+  roleName?: string | null;
 };
 
 export type CreateProjectResponse = {
@@ -199,6 +203,15 @@ export type AdminUser = {
   verificationStatus: string;
   status: string;
   createdAt: string;
+  /** The user's project assignments (each carries its per-project role). */
+  assignments: Array<{
+    projectId: string;
+    projectName: string | null;
+    roleId: string;
+    roleCode: RoleCode | null;
+    roleName: string | null;
+    status: string;
+  }>;
 };
 
 export type AssignableRole = {
@@ -511,15 +524,17 @@ export const api = {
     return request<{ roles: AssignableRole[] }>('/api/v1/organizations/roles');
   },
 
+  /** Project assignment with a per-project role. */
   async updateUserRole(
     organizationId: string,
     userId: string,
-    roleId: string,
-    projectId?: string,
+    payload:
+      | { roleId: string; assignments?: Array<{ projectId: string; roleId: string }> }
+      | { roleId: string; projectId?: string },
   ): Promise<{ message: string }> {
     return request<{ message: string }>(`/api/v1/organizations/${organizationId}/users/${userId}/role`, {
       method: 'PATCH',
-      body: JSON.stringify(projectId ? { roleId, projectId } : { roleId }),
+      body: JSON.stringify(payload),
     });
   },
 

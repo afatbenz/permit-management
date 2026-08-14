@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Users, ShieldCheck, FolderKanban } from 'lucide-react';
+import { Users, ShieldCheck, FolderKanban, Plus, Trash2, Pencil, X } from 'lucide-react';
 import {
   api,
   type AdminUser,
@@ -9,7 +9,6 @@ import {
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { SelectField } from '@/components/Field';
 import { Spinner, EmptyState } from '@/components/ui';
 
 const ROLE_LABELS: Record<string, string> = {
@@ -44,6 +43,241 @@ function RoleChip({ roleCode, roleName }: { roleCode: string | null; roleName: s
   );
 }
 
+/** Per-user project & role assignment dialog (org-admin view).
+ *  Left column lists the user's current projects with their per-project role;
+ *  the right editor adds/removes/re-roles assignments, saved in one shot. */
+function ProjectRoleDialog({
+  user,
+  projects,
+  roles,
+  onClose,
+  onSave,
+}: {
+  user: AdminUser;
+  projects: OrgProjectWithMembers[];
+  roles: AssignableRole[];
+  onClose: () => void;
+  onSave: (assignments: Array<{ projectId: string; roleId: string }>) => void;
+}) {
+  // Each row: { projectId, roleId }. Default role is the first assignable one.
+  const defaultRoleId = roles[0]?.id ?? '';
+  const active = user.assignments.filter((a) => a.status === 'active');
+  const rowFrom = (a: AdminUser['assignments'][number]) => ({
+    projectId: a.projectId,
+    roleId: a.roleId || defaultRoleId,
+  });
+  const [rows, setRows] = useState(() =>
+    user.assignments.map(rowFrom).filter((r) => r.projectId && r.roleId),
+  );
+  const [showAdd, setShowAdd] = useState(false);
+  const [nextProject, setNextProject] = useState('');
+  const [nextRole, setNextRole] = useState(defaultRoleId);
+
+  const usedProjectIds = new Set(rows.map((r) => r.projectId));
+  const availableProjects = projects.filter((p) => !usedProjectIds.has(p.id));
+
+  const addRow = () => {
+    if (!nextProject || !nextRole) return;
+    setRows((prev) => [...prev, { projectId: nextProject, roleId: nextRole }]);
+    setNextProject('');
+    setNextRole(defaultRoleId);
+    setShowAdd(false);
+  };
+
+  const updateRow = (index: number, patch: Partial<{ projectId: string; roleId: string }>) => {
+    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  };
+
+  const removeRow = (index: number) => {
+    setRows((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const save = () => {
+    const clean = rows
+      .map((r) => ({ projectId: r.projectId, roleId: r.roleId }))
+      .filter((r) => r.projectId && r.roleId);
+    onSave(clean);
+  };
+
+  const roleLabel = (roleId: string) =>
+    ROLE_LABELS[roles.find((r) => r.id === roleId)?.code ?? ''] ?? '—';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-gray-200 dark:bg-slate-900 dark:ring-slate-700">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-6 py-4 dark:border-slate-800">
+          <div>
+            <h2 className="text-base font-extrabold text-gray-900 dark:text-white">Kelola Proyek & Role</h2>
+            <p className="mt-0.5 text-sm text-gray-500 dark:text-slate-400">
+              {user.name} · {user.email}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            aria-label="Tutup dialog"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="grid gap-6 px-6 py-5 sm:grid-cols-2">
+          {/* Left: current assignments (read-only summary) */}
+          <div>
+            <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">
+              Proyek saat ini
+            </h3>
+            {active.length === 0 ? (
+              <p className="text-sm text-gray-400 dark:text-slate-500">Belum ada proyek.</p>
+            ) : (
+              <ul className="space-y-2">
+                {active.map((a) => (
+                  <li
+                    key={a.projectId}
+                    className="flex items-center justify-between gap-2 rounded-xl bg-gray-50 px-3 py-2 text-sm dark:bg-slate-800/40"
+                  >
+                    <span className="min-w-0 truncate font-medium text-gray-800 dark:text-slate-200">
+                      {a.projectName ?? '—'}
+                    </span>
+                    <span className="inline-flex flex-shrink-0 items-center rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
+                      {roleLabel(a.roleId)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Right: assignment editor */}
+          <div className="space-y-2">
+            <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">
+              Atur assignment
+            </h3>
+            {rows.map((row, i) => {
+              const currentForProject = user.assignments.find((a) => a.projectId === row.projectId);
+              const effectiveRoleId = row.roleId || currentForProject?.roleId || defaultRoleId;
+              return (
+                <div key={row.projectId || `row-${i}`} className="flex items-center gap-2">
+                  <select
+                    value={row.projectId}
+                    onChange={(e) => updateRow(i, { projectId: e.target.value })}
+                    className="input-field !py-1.5 text-xs"
+                  >
+                    {!row.projectId && <option value="">Pilih proyek</option>}
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={effectiveRoleId}
+                    onChange={(e) => updateRow(i, { roleId: e.target.value })}
+                    className="input-field !py-1.5 text-xs"
+                  >
+                    <option value={effectiveRoleId}>{roleLabel(effectiveRoleId)}</option>
+                    {roles
+                      .filter((r) => r.id !== effectiveRoleId)
+                      .map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}
+                        </option>
+                      ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => removeRow(i)}
+                    className="rounded-lg p-1.5 text-gray-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
+                    aria-label="Hapus assignment"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              );
+            })}
+
+            {showAdd ? (
+              <div className="flex items-center gap-2">
+                <select
+                  value={nextProject}
+                  onChange={(e) => setNextProject(e.target.value)}
+                  className="input-field !py-1.5 text-xs"
+                >
+                  <option value="">Pilih proyek</option>
+                  {availableProjects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={nextRole}
+                  onChange={(e) => setNextRole(e.target.value)}
+                  className="input-field !py-1.5 text-xs"
+                >
+                  {roles.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={addRow}
+                  disabled={!nextProject || !nextRole}
+                  className="rounded-lg bg-brand-600 p-1.5 text-white hover:bg-brand-700 disabled:opacity-40"
+                  aria-label="Tambahkan"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAdd(false)}
+                  className="rounded-lg p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
+                  aria-label="Batal"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowAdd(true)}
+                disabled={availableProjects.length === 0}
+                className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700 disabled:opacity-40 dark:text-brand-400"
+              >
+                <Plus className="h-3.5 w-3.5" /> Tambah proyek
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50/50 px-6 py-4 dark:border-slate-800 dark:bg-slate-800/30">
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn-ghost"
+          >
+            Batal
+          </button>
+          <button
+            type="button"
+            onClick={save}
+            disabled={rows.length === 0}
+            className="inline-flex items-center gap-1 rounded-xl bg-brand-600 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-brand-700 disabled:opacity-50"
+          >
+            <Pencil className="h-3.5 w-3.5" /> Simpan
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function UsersManagementPage() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -57,8 +291,8 @@ export function UsersManagementPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [roles, setRoles] = useState<AssignableRole[]>([]);
   const [projects, setProjects] = useState<OrgProjectWithMembers[]>([]);
-  // Pending project_admin assignment: userId → chosen projectId.
-  const [pendingAdminProject, setPendingAdminProject] = useState<Record<string, string>>({});
+  // User whose Project & Role dialog is open.
+  const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
 
   // --- Project-admin view state ---
   const [myProjects, setMyProjects] = useState<OrgProjectWithMembers[]>([]);
@@ -119,30 +353,24 @@ export function UsersManagementPage() {
     }
   };
 
-  /** Org-admin: change a user's role. project_admin also needs a project. */
-  const handleRoleChange = (targetUserId: string, roleId: string) => {
-    const roleObj = roles.find((r) => r.id === roleId);
-    if (roleObj?.code === 'project_admin') {
-      // Defer saving until a project is picked.
-      setPendingAdminProject((p) => ({ ...p, [targetUserId]: projects[0]?.id ?? '' }));
-      return;
-    }
+  /** Org-admin: save a user's global role + full project-assignment set. */
+  const handleSaveAssignments = async (
+    targetUserId: string,
+    globalRoleId: string,
+    assignments: Array<{ projectId: string; roleId: string }>,
+  ) => {
     setSavingId(targetUserId);
     run(async () => {
-      await api.updateUserRole(orgId, targetUserId, roleId);
+      await api.updateUserRole(orgId, targetUserId, { roleId: globalRoleId, assignments });
       await loadOrgAdminData();
     });
   };
 
-  /** Org-admin: pick the project for a project_admin assignment, then save. */
-  const handleAdminProjectPick = (targetUserId: string, projectId: string) => {
-    setPendingAdminProject((p) => ({ ...p, [targetUserId]: projectId }));
-    if (!projectId) return;
-    const roleObj = roles.find((r) => r.code === 'project_admin');
-    if (!roleObj) return;
+  /** Org-admin: change only the global role (admin/non-admin gate). */
+  const handleGlobalRoleChange = (targetUserId: string, roleId: string) => {
     setSavingId(targetUserId);
     run(async () => {
-      await api.updateUserRole(orgId, targetUserId, roleObj.id, projectId);
+      await api.updateUserRole(orgId, targetUserId, { roleId });
       await loadOrgAdminData();
     });
   };
@@ -255,7 +483,7 @@ export function UsersManagementPage() {
         <div>
           <h1 className="text-xl font-extrabold tracking-tight text-gray-900 dark:text-white">User Management</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
-            Kelola user dan role dalam organisasi Anda. Untuk role <span className="font-semibold text-brand-600">Project Admin</span>, pilih proyek yang bersangkutan.
+            Kelola role global (admin / non-admin) dan proyek user. Satu user bisa berada di beberapa proyek, masing-masing dengan role berbeda.
           </p>
         </div>
 
@@ -281,16 +509,15 @@ export function UsersManagementPage() {
                     <th className="px-5 py-3 font-semibold">Nama</th>
                     <th className="px-5 py-3 font-semibold">Email</th>
                     <th className="px-5 py-3 font-semibold">Verifikasi</th>
-                    <th className="px-5 py-3 font-semibold">Role</th>
-                    <th className="px-5 py-3 font-semibold">Proyek (untuk Project Admin)</th>
+                    <th className="px-5 py-3 font-semibold">Role Global</th>
+                    <th className="px-5 py-3 font-semibold">Proyek & Role</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
                   {users.map((u) => {
                     const isSelf = u.id === userId;
                     const isLocked = isSelf || u.roleCode === 'super_admin' || u.roleCode === 'unassigned';
-                    const pendingProject = pendingAdminProject[u.id];
-                    const choosingAdminProject = pendingProject !== undefined;
+                    const activeAssignments = u.assignments.filter((a) => a.status === 'active');
                     return (
                       <tr key={u.id} className="group transition-colors hover:bg-gray-50 dark:hover:bg-slate-800/40">
                         <td className="px-5 py-3.5">
@@ -316,7 +543,7 @@ export function UsersManagementPage() {
                             <select
                               value={u.roleId}
                               disabled={savingId === u.id}
-                              onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                              onChange={(e) => handleGlobalRoleChange(u.id, e.target.value)}
                               className="input-field !py-1.5 text-xs"
                             >
                               <option value={u.roleId}>{ROLE_LABELS[u.roleCode ?? ''] ?? u.roleName ?? '—'}</option>
@@ -329,35 +556,24 @@ export function UsersManagementPage() {
                                 ))}
                             </select>
                           )}
+                          {savingId === u.id && <Spinner className="ml-2 inline h-3.5 w-3.5" />}
                         </td>
                         <td className="px-5 py-3.5">
-                          {choosingAdminProject ? (
-                            <div className="flex items-center gap-2">
-                              <SelectField
-                                label=""
-                                value={pendingProject}
-                                onChange={(v) => handleAdminProjectPick(u.id, v)}
-                                options={projects.map((p) => ({ value: p.id, label: p.name }))}
-                                placeholder="Pilih proyek"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setPendingAdminProject((p) => {
-                                  const next = { ...p };
-                                  delete next[u.id];
-                                  return next;
-                                })}
-                                className="text-xs font-medium text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
-                              >
-                                Batal
-                              </button>
-                            </div>
-                          ) : (
+                          <div className="flex items-center gap-2">
                             <span className="text-xs text-gray-400 dark:text-slate-500">
-                              {u.roleCode === 'project_admin' ? 'Lihat kolom role' : '—'}
+                              {activeAssignments.length === 0
+                                ? '—'
+                                : `${activeAssignments.length} proyek`}
                             </span>
-                          )}
-                          {savingId === u.id && <Spinner className="ml-2 inline h-3.5 w-3.5" />}
+                            <button
+                              type="button"
+                              onClick={() => setEditingUser(u)}
+                              disabled={isSelf}
+                              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                            >
+                              <Pencil className="h-3 w-3" /> Assign
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -372,6 +588,20 @@ export function UsersManagementPage() {
           Catatan: role <span className="font-mono">Super Admin</span> dan <span className="font-mono">Unassigned</span> tidak bisa diubah dari sini.
         </p>
       </div>
+
+      {/* Project & role assignment dialog */}
+      {editingUser && (
+        <ProjectRoleDialog
+          user={editingUser}
+          projects={projects}
+          roles={roles}
+          onClose={() => setEditingUser(null)}
+          onSave={(assignments) => {
+            handleSaveAssignments(editingUser.id, editingUser.roleId, assignments);
+            setEditingUser(null);
+          }}
+        />
+      )}
     </DashboardLayout>
   );
 }
