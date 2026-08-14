@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Users, ShieldCheck, FolderKanban, Plus, Trash2, Pencil, X } from 'lucide-react';
+import { Users, ShieldCheck, FolderKanban, Plus, Trash2, Pencil, X, Copy, Check, KeyRound } from 'lucide-react';
 import {
   api,
   type AdminUser,
   type AssignableRole,
+  type InvitationCode,
   type OrgProjectWithMembers,
   type RoleCode,
 } from '@/lib/api';
@@ -319,6 +320,12 @@ export function UsersManagementPage() {
   // --- Project-admin view state ---
   const [myProjects, setMyProjects] = useState<OrgProjectWithMembers[]>([]);
 
+  // --- Invitation codes (org scope; Settings page shows the same list) ---
+  const [codes, setCodes] = useState<InvitationCode[]>([]);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  // Which project's code to show in the org-admin dropdown, if any.
+  const [codeProjectId, setCodeProjectId] = useState('');
+
   const [savingId, setSavingId] = useState<string | null>(null);
 
   const orgId = user?.organizationId ?? '';
@@ -329,14 +336,16 @@ export function UsersManagementPage() {
     setLoading(true);
     setError('');
     try {
-      const [u, r, p] = await Promise.all([
+      const [u, r, p, c] = await Promise.all([
         api.listUsers(orgId),
         api.listAssignableRoles(),
         api.listOrgProjects(orgId),
+        api.getInvitationCodes(orgId),
       ]);
       setUsers(u.users);
       setRoles(r.roles);
       setProjects(p.projects);
+      setCodes(c.codes);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal memuat data user.');
     } finally {
@@ -349,7 +358,11 @@ export function UsersManagementPage() {
     setLoading(true);
     setError('');
     try {
-      const [res, r] = await Promise.all([api.listOrgProjects(orgId), api.listAssignableRoles()]);
+      const [res, r, c] = await Promise.all([
+        api.listOrgProjects(orgId),
+        api.listAssignableRoles(),
+        api.getInvitationCodes(orgId),
+      ]);
       // A member acts inside the project they picked: show that project's
       // members so they can manage per-project roles there.
       const project = activeProject
@@ -357,6 +370,7 @@ export function UsersManagementPage() {
         : null;
       setMyProjects(project ? [project] : []);
       setRoles(r.roles);
+      setCodes(c.codes);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal memuat data proyek.');
     } finally {
@@ -391,6 +405,16 @@ export function UsersManagementPage() {
       await api.updateUserRole(orgId, targetUserId, { roleId: globalRoleId, assignments });
       await loadOrgAdminData();
     });
+  };
+
+  const copyCode = async (id: string, code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 1500);
+    } catch {
+      setError('Gagal menyalin kode ke clipboard.');
+    }
   };
 
   /** Project-admin: change a same-project member's role. */
@@ -428,7 +452,37 @@ export function UsersManagementPage() {
               description="Project yang Anda pilih belum memiliki anggota yang bisa dikelola."
             />
           ) : (
-            myProjects.map((proj) => (
+            <>
+            {/* Invitation code for the project(s) this project admin manages */}
+            {myProjects.map((proj) => {
+              const code = codes.find((c) => c.projectId === proj.id);
+              return code ? (
+                <div key={`inv-${proj.id}`} className="card flex flex-wrap items-center justify-between gap-3 p-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+                      <KeyRound className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                        Kode Undangan — {proj.name}
+                      </p>
+                      <p className="font-mono text-lg font-bold tracking-widest text-brand-600 dark:text-brand-400">
+                        {code.code}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => copyCode(code.id, code.code)}
+                    className="btn-ghost"
+                  >
+                    {copiedId === code.id ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+                    {copiedId === code.id ? 'Tersalin' : 'Salin'}
+                  </button>
+                </div>
+              ) : null;
+            })}
+            {myProjects.map((proj) => (
               <div key={proj.id} className="card overflow-hidden">
                 <div className="border-b border-gray-200 px-5 py-4 dark:border-slate-800">
                   <h2 className="text-base font-bold text-gray-900 dark:text-white">{proj.name}</h2>
@@ -487,7 +541,8 @@ export function UsersManagementPage() {
                   </table>
                 </div>
               </div>
-            ))
+            ))}
+            </>
           )}
         </div>
       </DashboardLayout>
@@ -507,6 +562,63 @@ export function UsersManagementPage() {
 
         {error && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600 ring-1 ring-rose-600/10 dark:bg-rose-500/10 dark:text-rose-400">{error}</div>}
         {savingError && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600 ring-1 ring-rose-600/10 dark:bg-rose-500/10 dark:text-rose-400">{savingError}</div>}
+
+        {/* Invitation code — admins pick a project to reveal + copy its code */}
+        <div className="card p-5">
+          <div className="flex items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+              <KeyRound className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-gray-900 dark:text-white">Kode Undangan Proyek</h2>
+              <p className="text-xs text-gray-500 dark:text-slate-400">
+                Bagikan kode ini kepada calon user agar bisa bergabung ke proyek.
+              </p>
+            </div>
+          </div>
+
+          {projects.length === 0 ? (
+            <p className="mt-4 text-sm text-gray-500 dark:text-slate-400">
+              Belum ada proyek. Kode dibuat otomatis saat proyek dibuat.
+            </p>
+          ) : (
+            <div className="mt-4 flex flex-wrap items-end gap-3">
+              <div className="min-w-56 max-w-sm flex-1">
+                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-slate-300">Proyek</label>
+                <select
+                  value={codeProjectId}
+                  onChange={(e) => setCodeProjectId(e.target.value)}
+                  className="input-field"
+                >
+                  <option value="">Pilih proyek</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              {(() => {
+                const code = codes.find((c) => c.projectId === codeProjectId);
+                if (!code) return null;
+                return (
+                  <div className="flex items-center gap-3 pb-1">
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-slate-400">Kode undangan</p>
+                      <p className="font-mono text-lg font-bold tracking-widest text-brand-600 dark:text-brand-400">{code.code}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyCode(code.id, code.code)}
+                      className="btn-ghost"
+                    >
+                      {copiedId === code.id ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+                      {copiedId === code.id ? 'Tersalin' : 'Salin'}
+                    </button>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </div>
 
         <div className="card overflow-hidden">
           {loading ? (
