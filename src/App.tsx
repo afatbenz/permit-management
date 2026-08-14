@@ -112,11 +112,15 @@ function Routes() {
     }
     return page;
   };
-  // Users / Organization / Project pages are project-scoped — an admin with
-  // no ACTIVE project assignment gets bounced to the dashboard (mirrors the
-  // sidebar hiding those menus).
+  // Users / Organization / Project pages are project-scoped — a user with no
+  // ACTIVE project assignment gets bounced to the dashboard (mirrors the
+  // sidebar hiding those menus). For members the binding to a project is
+  // established the moment they pick one (`activeProject`), so that is the
+  // single source of truth here — `hasProject` would stay stale/false for a
+  // member even though their assignment is active.
+  const hasAccessibleProject = isMember ? !!activeProject : hasProject;
   const projectScopedRoute = (page: ReactNode) => {
-    if (!hasProject) {
+    if (!hasAccessibleProject) {
       navigate('/dashboard');
       return null;
     }
@@ -135,7 +139,9 @@ function Routes() {
     return projectScopedRoute(adminRoute(<ProjectCategoryPage />, true));
   }
   if (segments[0] === 'dashboard' && segments[1] === 'projects') {
-    return projectScopedRoute(adminRoute(<ProjectsPage />));
+    // project_admin is admitted (nav shows All Project for them) — the page
+    // itself only lists, it never mutates projects.
+    return projectScopedRoute(adminRoute(<ProjectsPage />, true));
   }
   if (segments[0] === 'dashboard' && segments[1] === 'profile') return <ProfilePage />;
   if (segments[0] === 'dashboard' && segments[1] === 'permits' && segments[2] === 'new') return <NewPermitPage />;
