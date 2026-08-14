@@ -99,6 +99,7 @@ const NAV: Array<{ section: string; entry: NavEntry }> = [
           icon: <FolderKanban className="h-4 w-4" />,
           path: '/dashboard/projects',
           match: (s) => s[0] === 'dashboard' && s[1] === 'projects' && s.length === 2,
+          adminOnly: true,
         },
         {
           label: 'Bank Question',

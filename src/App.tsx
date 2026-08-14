@@ -139,9 +139,8 @@ function Routes() {
     return projectScopedRoute(adminRoute(<ProjectCategoryPage />, true));
   }
   if (segments[0] === 'dashboard' && segments[1] === 'projects') {
-    // project_admin is admitted (nav shows All Project for them) — the page
-    // itself only lists, it never mutates projects.
-    return projectScopedRoute(adminRoute(<ProjectsPage />, true));
+    // org_admin only — project_admin must not reach the org-wide project list.
+    return projectScopedRoute(adminRoute(<ProjectsPage />));
   }
   if (segments[0] === 'dashboard' && segments[1] === 'profile') return <ProfilePage />;
   if (segments[0] === 'dashboard' && segments[1] === 'permits' && segments[2] === 'new') return <NewPermitPage />;
