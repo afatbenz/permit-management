@@ -181,7 +181,19 @@ export function DashboardLayout({ children, active }: { children: ReactNode; act
   const isAdmin = roleCode === 'org_admin' || roleCode === 'super_admin';
   const isProjectAdmin = roleCode === 'project_admin';
 
-  // Filter visible entries by role + project binding.
+  // Filter visible entries by role + project binding. Shared between the
+  // visibility decision (does the group survive?) and the actual rendering —
+  // filtering only for the gate and then rendering `group.children` raw was a
+  // bug: admin-only children (e.g. All Project) leaked through to members.
+  const filterChildren = (children: NavChild[]) =>
+    children.filter((c) => {
+      if (c.adminOnly && !isAdmin) return false;
+      if (c.adminOrProjectAdmin && !isAdmin && !isProjectAdmin) return false;
+      if (c.excludeRoles?.includes(roleCode ?? 'unassigned')) return false;
+      if (c.needsProject && !hasAccessibleProject) return false;
+      return true;
+    });
+
   const visible = NAV.filter(({ entry }) => {
     if (entry.kind === 'item') {
       if (entry.adminOnly && !isAdmin) return false;
@@ -193,14 +205,7 @@ export function DashboardLayout({ children, active }: { children: ReactNode; act
     if (entry.gate === 'admin' && !isAdmin) return false;
     if (entry.gate === 'adminOrProjectAdmin' && !isAdmin && !isProjectAdmin) return false;
     if (entry.needsProject && !hasAccessibleProject) return false;
-    const visibleChildren = entry.children.filter((c) => {
-      if (c.adminOnly && !isAdmin) return false;
-      if (c.adminOrProjectAdmin && !isAdmin && !isProjectAdmin) return false;
-      if (c.excludeRoles?.includes(roleCode ?? 'unassigned')) return false;
-      if (c.needsProject && !hasAccessibleProject) return false;
-      return true;
-    });
-    return visibleChildren.length > 0;
+    return filterChildren(entry.children).length > 0;
   });
 
   const childActive = (child: NavChild) => child.label === active;
@@ -285,7 +290,7 @@ export function DashboardLayout({ children, active }: { children: ReactNode; act
             }`}
           />
         </button>
-        {expanded && <div className="mt-0.5 space-y-0.5 pl-3">{group.children.map(renderSubChild)}</div>}
+        {expanded && <div className="mt-0.5 space-y-0.5 pl-3">{filterChildren(group.children).map(renderSubChild)}</div>}
       </div>
     );
   };
