@@ -96,9 +96,13 @@ function Routes() {
   }
 
   // Admin-only dashboard pages — org_admin / super_admin. Some also admit
-  // project_admin (Project Category page).
-  const isAdmin = user?.role?.code === 'org_admin' || user?.role?.code === 'super_admin';
-  const isProjectAdmin = user?.role?.code === 'project_admin';
+  // project_admin (Bank Question / Users pages). For members the effective
+  // role is the per-project role of the project they picked (e.g. a user whose
+  // global role is supervisor_subcon but holds project_admin in their project
+  // gets the project_admin menus); org-level pages still require a true admin.
+  const effectiveRole = isMember ? (activeProject?.roleCode ?? user?.role?.code) : user?.role?.code;
+  const isAdmin = effectiveRole === 'org_admin' || effectiveRole === 'super_admin';
+  const isProjectAdmin = effectiveRole === 'project_admin';
 
   const adminRoute = (page: ReactNode, includeProjectAdmin = false) => {
     if (!isAdmin && !(includeProjectAdmin && isProjectAdmin)) {
@@ -118,7 +122,7 @@ function Routes() {
     return page;
   };
   if (segments[0] === 'dashboard' && segments[1] === 'users') {
-    return projectScopedRoute(adminRoute(<UsersManagementPage />));
+    return projectScopedRoute(adminRoute(<UsersManagementPage />, true));
   }
   if (segments[0] === 'dashboard' && segments[1] === 'settings') {
     return projectScopedRoute(adminRoute(<OrganizationSettingsPage />));

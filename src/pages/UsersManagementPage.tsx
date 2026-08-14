@@ -8,6 +8,7 @@ import {
   type RoleCode,
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { useActiveProject } from '@/lib/activeProject';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Spinner, EmptyState } from '@/components/ui';
 
@@ -297,11 +298,15 @@ function ProjectRoleDialog({
 
 export function UsersManagementPage() {
   const { user } = useAuth();
+  // Members act as their per-project role: a user whose global role is e.g.
+  // supervisor_subcon but holds project_admin in the project they picked gets
+  // the project-admin view here (matches the sidebar + routing).
+  const { activeProject, isMember } = useActiveProject();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [savingError, setSavingError] = useState('');
 
-  const role = user?.role?.code ?? null;
+  const role = isMember ? (activeProject?.roleCode ?? user?.role?.code) : user?.role?.code;
   const isOrgAdmin = role === 'org_admin' || role === 'super_admin';
 
   // --- Org-admin view state ---
@@ -345,14 +350,19 @@ export function UsersManagementPage() {
     setError('');
     try {
       const [res, r] = await Promise.all([api.listOrgProjects(orgId), api.listAssignableRoles()]);
-      setMyProjects(res.projects.filter((p) => p.projectAdminId === userId));
+      // A member acts inside the project they picked: show that project's
+      // members so they can manage per-project roles there.
+      const project = activeProject
+        ? res.projects.find((p) => p.id === activeProject.id)
+        : null;
+      setMyProjects(project ? [project] : []);
       setRoles(r.roles);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal memuat data proyek.');
     } finally {
       setLoading(false);
     }
-  }, [orgId, userId]);
+  }, [orgId, activeProject]);
 
   useEffect(() => {
     if (isOrgAdmin) loadOrgAdminData();
@@ -400,7 +410,7 @@ export function UsersManagementPage() {
           <div>
             <h1 className="text-xl font-extrabold tracking-tight text-gray-900 dark:text-white">Kelola Anggota Proyek</h1>
             <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
-              Anda dapat mengatur role user lain dalam proyek yang Anda admin.
+              Anda dapat mengatur role user lain dalam proyek yang Anda pilih.
             </p>
           </div>
 
@@ -414,8 +424,8 @@ export function UsersManagementPage() {
           ) : myProjects.length === 0 ? (
             <EmptyState
               icon={<FolderKanban className="h-6 w-6" />}
-              title="Belum ada proyek yang Anda admin"
-              description="Anda akan menjadi Project Admin pada proyek pertama yang Anda tambahkan."
+              title="Tidak ada anggota proyek"
+              description="Project yang Anda pilih belum memiliki anggota yang bisa dikelola."
             />
           ) : (
             myProjects.map((proj) => (

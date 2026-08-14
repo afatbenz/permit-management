@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FolderTree, Loader2, Plus, Trash2, ChevronDown } from 'lucide-react';
 import { api, type PermitCategory, type Project } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { useActiveProject } from '@/lib/activeProject';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { SelectField, Field } from '@/components/Field';
 import { CategoryBadge, EmptyState, Spinner } from '@/components/ui';
@@ -9,7 +10,8 @@ import { CATEGORY_COLORS } from '@/lib/categoryColors';
 
 export function ProjectCategoryPage() {
   const { user } = useAuth();
-  const roleCode = user?.role?.code;
+  // Members work inside their chosen project — the picker is locked to it.
+  const { activeProject, isMember } = useActiveProject();
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState('');
@@ -24,8 +26,7 @@ export function ProjectCategoryPage() {
   const [newName, setNewName] = useState('');
   const [newColor, setNewColor] = useState<string>(CATEGORY_COLORS[0]);
 
-  const isAdmin =
-    roleCode === 'org_admin' || roleCode === 'super_admin' || roleCode === 'project_admin';
+  const canMutate = !!projectId;
 
   const loadProjects = useCallback(async () => {
     setError('');
@@ -57,9 +58,14 @@ export function ProjectCategoryPage() {
   }, []);
 
   useEffect(() => {
+    // Members are locked to their chosen project — no admin list fallback.
+    if (isMember) {
+      if (activeProject) setProjectId(activeProject.id);
+      return;
+    }
     loadProjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isMember, activeProject?.id]);
 
   useEffect(() => {
     if (!projectId) {
@@ -70,7 +76,7 @@ export function ProjectCategoryPage() {
     loadCategories(projectId);
   }, [projectId, loadCategories]);
 
-  const selectedProject = useMemo(() => projects.find((p) => p.id === projectId), [projects, projectId]);
+  const selectedProject = useMemo(() => projects.find((p) => p.id === projectId) ?? (activeProject ?? null), [projects, projectId, activeProject]);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,13 +129,11 @@ export function ProjectCategoryPage() {
     }
   };
 
-  const canMutate = isAdmin && !!projectId;
-
   return (
     <DashboardLayout active="Project Category">
       <div className="space-y-5">
         <div>
-          <h1 className="text-xl font-extrabold tracking-tight text-gray-900 dark:text-white">Project Category</h1>
+          <h1 className="text-xl font-extrabold tracking-tight text-gray-900 dark:text-white">Bank Question</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
             Kelola kategori permit dan warna dokumen per proyek
           </p>

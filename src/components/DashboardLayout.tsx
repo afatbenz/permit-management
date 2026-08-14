@@ -31,6 +31,8 @@ type NavChild = {
   path: string;
   match: (segs: string[]) => boolean;
   adminOnly?: boolean;
+  /** Admins + members whose per-project role is project_admin (effective role). */
+  adminOrProjectAdmin?: boolean;
   excludeRoles?: RoleCode[];
   /** Requires at least one ACTIVE project assignment (hidden otherwise). */
   needsProject?: boolean;
@@ -91,7 +93,7 @@ const NAV: NavEntry[] = [
         adminOnly: true,
       },
       {
-        label: 'Project Category',
+        label: 'Bank Question',
         icon: <FolderTree className="h-4 w-4" />,
         path: '/dashboard/projects/categories',
         match: (s) => s[0] === 'dashboard' && s[1] === 'projects' && s[2] === 'categories',
@@ -108,7 +110,7 @@ const NAV: NavEntry[] = [
         icon: <Users className="h-4 w-4" />,
         path: '/dashboard/users',
         match: (s) => s[0] === 'dashboard' && s[1] === 'users',
-        adminOnly: true,
+        adminOrProjectAdmin: true,
         needsProject: true,
       },
       {
@@ -143,23 +145,28 @@ export function DashboardLayout({ children, active }: { children: ReactNode; act
     .slice(0, 2)
     .map((p) => p[0]?.toUpperCase() ?? '')
     .join('');
-  const roleName = user?.role?.name ?? '';
-  const roleCode = user?.role?.code;
-  const isAdmin = roleCode === 'org_admin' || roleCode === 'super_admin';
-  const isProjectAdmin = roleCode === 'project_admin';
-
-  // Permit Management only makes sense once the user is bound to an ACTIVE
-  // project. Admins are auto-assigned to the project they create, so this is
-  // a real signal for every role (project-less accounts see Home + Settings).
+  // The effective role for the CURRENT context: members act as the role they
+  // hold inside the project they picked (e.g. project_admin), admins as their
+  // global role. The global role only gates the admin organization pages.
   const { hasProject } = useHasProject(user?.id);
   // Members are project-scoped by session: nav gates on the chosen project.
   const { activeProject, isMember } = useActiveProject();
   const hasAccessibleProject = isMember ? !!activeProject : hasProject;
 
+  const roleCode = isMember
+    ? (activeProject?.roleCode ?? user?.role?.code)
+    : (user?.role?.code ?? null);
+  const roleName = isMember
+    ? (activeProject?.roleName ?? user?.role?.name ?? '')
+    : (user?.role?.name ?? '');
+  const isAdmin = roleCode === 'org_admin' || roleCode === 'super_admin';
+  const isProjectAdmin = roleCode === 'project_admin';
+
   // Filter visible entries by role + project binding.
   const visible = NAV.filter((entry) => {
     if (entry.kind === 'item') {
       if (entry.adminOnly && !isAdmin) return false;
+      if (entry.adminOrProjectAdmin && !isAdmin && !isProjectAdmin) return false;
       if (entry.excludeRoles?.includes(roleCode ?? 'unassigned')) return false;
       if (entry.needsProject && !hasAccessibleProject) return false;
       return true;
@@ -169,6 +176,7 @@ export function DashboardLayout({ children, active }: { children: ReactNode; act
     if (entry.needsProject && !hasAccessibleProject) return false;
     const visibleChildren = entry.children.filter((c) => {
       if (c.adminOnly && !isAdmin) return false;
+      if (c.adminOrProjectAdmin && !isAdmin && !isProjectAdmin) return false;
       if (c.excludeRoles?.includes(roleCode ?? 'unassigned')) return false;
       if (c.needsProject && !hasAccessibleProject) return false;
       return true;
