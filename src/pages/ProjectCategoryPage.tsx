@@ -142,23 +142,38 @@ export function ProjectCategoryPage() {
         {error && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600 ring-1 ring-rose-600/10 dark:bg-rose-500/10 dark:text-rose-400">{error}</div>}
         {success && <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700 ring-1 ring-emerald-600/10 dark:bg-emerald-500/10 dark:text-emerald-400">{success}</div>}
 
-        {/* Project picker */}
-        <div className="card max-w-md p-5">
-          <SelectField
-            id="project"
-            label="Pilih Proyek"
-            value={projectId}
-            onChange={setProjectId}
-            options={projects.map((p) => ({ value: p.id, label: p.name }))}
-            placeholder="Pilih proyek"
-            required
-          />
-          {selectedProject && (
-            <p className="mt-2 text-xs text-gray-400 dark:text-slate-500">
-              Kode: <span className="font-mono">{selectedProject.projectCode}</span>
+        {/* Project context — members are bound to their chosen project (picked
+            once in the header, no re-selection needed); admins pick one here. */}
+        {isMember ? (
+          <div className="card max-w-md p-5">
+            <p className="text-sm text-gray-600 dark:text-slate-300">
+              Project: <span className="font-semibold text-gray-900 dark:text-white">{selectedProject?.name ?? '—'}</span>
+              {selectedProject?.projectCode && (
+                <span className="ml-2 font-mono text-xs text-gray-400 dark:text-slate-500">{selectedProject.projectCode}</span>
+              )}
             </p>
-          )}
-        </div>
+            <p className="mt-1 text-xs text-gray-400 dark:text-slate-500">
+              Project aktif dari pemilihan di header — tidak perlu pilih lagi.
+            </p>
+          </div>
+        ) : (
+          <div className="card max-w-md p-5">
+            <SelectField
+              id="project"
+              label="Pilih Proyek"
+              value={projectId}
+              onChange={setProjectId}
+              options={projects.map((p) => ({ value: p.id, label: p.name }))}
+              placeholder="Pilih proyek"
+              required
+            />
+            {selectedProject && (
+              <p className="mt-2 text-xs text-gray-400 dark:text-slate-500">
+                Kode: <span className="font-mono">{selectedProject.projectCode}</span>
+              </p>
+            )}
+          </div>
+        )}
 
         {!projectId ? (
           <EmptyState
