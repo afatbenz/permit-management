@@ -130,6 +130,8 @@ export function BankQuestionPage() {
   const [success, setSuccess] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<BankQuestion | null>(null);
+  // '' = semua kategori
+  const [filterCategory, setFilterCategory] = useState('');
 
   const canMutate = !!projectId;
 
@@ -187,6 +189,7 @@ export function BankQuestionPage() {
       setLoading(false);
       return;
     }
+    setFilterCategory('');
     loadQuestions(projectId);
     loadCategories(projectId);
   }, [projectId, loadQuestions, loadCategories]);
@@ -194,6 +197,11 @@ export function BankQuestionPage() {
   const selectedProject = useMemo(
     () => projects.find((p) => p.id === projectId) ?? (activeProject ?? null),
     [projects, projectId, activeProject],
+  );
+
+  const filteredQuestions = useMemo(
+    () => (filterCategory ? questions.filter((q) => q.categoryId === filterCategory) : questions),
+    [questions, filterCategory],
   );
 
   const handleSave = async (payload: { categoryId: string; questionEn: string; questionId: string }) => {
@@ -290,6 +298,30 @@ export function BankQuestionPage() {
           </div>
         )}
 
+        {/* Category filter */}
+        {projectId && (
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="min-w-56 max-w-sm">
+              <SelectField
+                id="bqFilter"
+                label="Filter Kategori"
+                value={filterCategory}
+                onChange={setFilterCategory}
+                options={[{ value: '', label: 'Semua Kategori' }, ...categories.map((c) => ({ value: c.id, label: c.name }))]}
+              />
+            </div>
+            {filterCategory && (
+              <button
+                type="button"
+                onClick={() => setFilterCategory('')}
+                className="inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
+              >
+                <X className="h-3.5 w-3.5" /> Hapus filter
+              </button>
+            )}
+          </div>
+        )}
+
         {!projectId ? (
           <EmptyState
             icon={<FileCheck className="h-6 w-6" />}
@@ -306,6 +338,17 @@ export function BankQuestionPage() {
             title="Belum ada pertanyaan"
             description="Tambahkan pertanyaan checklist untuk setiap kategori permit proyek ini."
           />
+        ) : filteredQuestions.length === 0 ? (
+          <EmptyState
+            icon={<FileCheck className="h-6 w-6" />}
+            title="Tidak ada pertanyaan di kategori ini"
+            description="Coba pilih kategori lain atau hapus filter."
+            action={
+              <button onClick={() => setFilterCategory('')} className="btn-ghost">
+                Hapus filter
+              </button>
+            }
+          />
         ) : (
           <div className="card overflow-hidden">
             <div className="overflow-x-auto">
@@ -319,7 +362,7 @@ export function BankQuestionPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
-                  {questions.map((q, i) => (
+                  {filteredQuestions.map((q, i) => (
                     <tr key={q.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/40">
                       <td className="px-5 py-3.5 text-gray-400 dark:text-slate-500">{i + 1}</td>
                       <td className="max-w-xl px-5 py-3.5 text-gray-800 dark:text-slate-200">{q.questionEn}</td>
