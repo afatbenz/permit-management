@@ -24,6 +24,12 @@ function Routes() {
   const { segments } = useRoute();
   const { navigate } = useRouter();
   const { user, loading } = useAuth();
+  // All hooks are called unconditionally at the top — Routes() has many early
+  // returns (public pages, onboarding, picker redirects) and any hook declared
+  // after one of them would make the hook count vary between renders, which
+  // React rejects ("Rendered more hooks than during the previous render").
+  const { activeProject, isMember } = useActiveProject();
+  const { hasProject } = useHasProject(user?.id);
 
   const isPublicPage = segments[0] === 'login' || segments[0] === 'register';
 
@@ -75,10 +81,6 @@ function Routes() {
   // the effect above redirects to /onboarding (avoids a content flash).
   if (isUnassigned) return null;
 
-  // Non-admins work inside a single chosen project (session scoping).
-  // Called before the picker routing below (hooks must not be gated).
-  const { activeProject, isMember } = useActiveProject();
-
   // Non-admins work inside a chosen project: they pick one right after login,
   // and the picker is always reachable (header "ganti project") to switch.
   if (segments[0] === 'select-project') {
@@ -97,7 +99,6 @@ function Routes() {
   // project_admin (Project Category page).
   const isAdmin = user?.role?.code === 'org_admin' || user?.role?.code === 'super_admin';
   const isProjectAdmin = user?.role?.code === 'project_admin';
-  const { hasProject } = useHasProject(user?.id);
 
   const adminRoute = (page: ReactNode, includeProjectAdmin = false) => {
     if (!isAdmin && !(includeProjectAdmin && isProjectAdmin)) {
