@@ -24,10 +24,10 @@ function Routes() {
   const { segments } = useRoute();
   const { navigate } = useRouter();
   const { user, loading } = useAuth();
-  // All hooks are called unconditionally at the top — Routes() has many early
-  // returns (public pages, onboarding, picker redirects) and any hook declared
-  // after one of them would make the hook count vary between renders, which
-  // React rejects ("Rendered more hooks than during the previous render").
+  // All hooks are called unconditionally at the very top — Routes() has many
+  // early returns (public pages, onboarding, picker redirects) and any hook
+  // declared after one of them would make the hook count vary between renders,
+  // which React rejects ("Rendered more hooks than during the previous render").
   const { activeProject, isMember } = useActiveProject();
   const { hasProject } = useHasProject(user?.id);
 
@@ -35,6 +35,14 @@ function Routes() {
 
   // Accounts before onboarding carry the 'unassigned' role.
   const isUnassigned = user?.role?.code === 'unassigned';
+
+  // An 'unassigned' account must complete onboarding before using the app.
+  // Done as an effect so a manual navigate() to /dashboard (e.g. an in-page
+  // "Ke Dashboard" button) is caught on the next render too, not only on
+  // initial load.
+  useEffect(() => {
+    if (isUnassigned) navigate('/onboarding');
+  }, [isUnassigned, navigate]);
 
   // Wait for boot (memory-only, so effectively instant) before deciding.
   if (loading) {
@@ -61,14 +69,6 @@ function Routes() {
     if (segments[0] === 'login') return <LoginPage />;
     return <RegisterPage />;
   }
-
-  // An 'unassigned' account must complete onboarding before using the app.
-  // Done as an effect so a manual navigate() to /dashboard (e.g. an in-page
-  // "Ke Dashboard" button) is caught on the next render too, not only on
-  // initial load.
-  useEffect(() => {
-    if (isUnassigned) navigate('/onboarding');
-  }, [isUnassigned, navigate]);
 
   // Onboarding page is only for accounts that haven't picked an org yet.
   if (segments[0] === 'onboarding') {

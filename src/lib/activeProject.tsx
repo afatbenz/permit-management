@@ -41,7 +41,10 @@ export function ActiveProjectProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [activeProject, setActiveProject] = useState<ActiveProject | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Start "loading" so the picker never flashes the empty state ("Belum ada
+  // project") on the very first render — the member effect below resolves
+  // it to the real list right after.
+  const [loading, setLoading] = useState(true);
 
   const isMember = !!user && user.role?.code !== 'org_admin' && user.role?.code !== 'super_admin';
 
