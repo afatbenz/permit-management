@@ -43,6 +43,27 @@ function RoleChip({ roleCode, roleName }: { roleCode: string | null; roleName: s
   );
 }
 
+/** Global role is a binary gate: admin vs non-admin. Function lives per-project. */
+const isAdminCode = (code: string | null | undefined) => code === 'org_admin' || code === 'super_admin';
+
+/** Global role chip: "Organization Admin" / "Super Admin" / "Member". */
+function GlobalRoleChip({ code }: { code: string | null }) {
+  const isSuper = code === 'super_admin';
+  const isAdmin = isSuper || code === 'org_admin';
+  const text = isSuper ? 'Super Admin' : isAdmin ? 'Organization Admin' : 'Member';
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+        isAdmin
+          ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300'
+          : 'bg-gray-100 text-gray-700 dark:bg-slate-800 dark:text-slate-300'
+      }`}
+    >
+      {text}
+    </span>
+  );
+}
+
 /** Per-user project & role assignment dialog (org-admin view).
  *  A table of the user's projects: Nama Project + Role select (current role
  *  pre-selected) + remove. A "Tambah Project" row at the bottom picks a new
@@ -362,15 +383,6 @@ export function UsersManagementPage() {
     });
   };
 
-  /** Org-admin: change only the global role (admin/non-admin gate). */
-  const handleGlobalRoleChange = (targetUserId: string, roleId: string) => {
-    setSavingId(targetUserId);
-    run(async () => {
-      await api.updateUserRole(orgId, targetUserId, { roleId });
-      await loadOrgAdminData();
-    });
-  };
-
   /** Project-admin: change a same-project member's role. */
   const handleProjectMemberRoleChange = (projectId: string, targetUserId: string, roleId: string) => {
     setSavingId(targetUserId);
@@ -479,7 +491,7 @@ export function UsersManagementPage() {
         <div>
           <h1 className="text-xl font-extrabold tracking-tight text-gray-900 dark:text-white">User Management</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
-            Kelola role global (admin / non-admin) dan proyek user. Satu user bisa berada di beberapa proyek, masing-masing dengan role berbeda.
+            Role Global adalah akses admin organisasi (Organization Admin / Member). Role per proyek dikelola lewat tombol Assign — satu user bisa berada di beberapa proyek dengan role berbeda.
           </p>
         </div>
 
@@ -512,7 +524,6 @@ export function UsersManagementPage() {
                 <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
                   {users.map((u) => {
                     const isSelf = u.id === userId;
-                    const isLocked = isSelf || u.roleCode === 'super_admin' || u.roleCode === 'unassigned';
                     const activeAssignments = u.assignments.filter((a) => a.status === 'active');
                     return (
                       <tr key={u.id} className="group transition-colors hover:bg-gray-50 dark:hover:bg-slate-800/40">
@@ -533,26 +544,7 @@ export function UsersManagementPage() {
                           </span>
                         </td>
                         <td className="px-5 py-3.5">
-                          {isLocked ? (
-                            <RoleChip roleCode={u.roleCode} roleName={u.roleName} />
-                          ) : (
-                            <select
-                              value={u.roleId}
-                              disabled={savingId === u.id}
-                              onChange={(e) => handleGlobalRoleChange(u.id, e.target.value)}
-                              className="input-field !py-1.5 text-xs"
-                            >
-                              <option value={u.roleId}>{ROLE_LABELS[u.roleCode ?? ''] ?? u.roleName ?? '—'}</option>
-                              {roles
-                                .filter((r) => r.id !== u.roleId)
-                                .map((r) => (
-                                  <option key={r.id} value={r.id}>
-                                    {r.name}
-                                  </option>
-                                ))}
-                            </select>
-                          )}
-                          {savingId === u.id && <Spinner className="ml-2 inline h-3.5 w-3.5" />}
+                          <GlobalRoleChip code={u.roleCode} />
                         </td>
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-2">
