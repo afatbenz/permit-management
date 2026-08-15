@@ -1,22 +1,53 @@
-import { useMemo, useState } from 'react';
-import { Plus, Search, FileText, Eye, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { useMemo, useState, useEffect } from 'react';
+import { Plus, Search, FileText, Eye, ChevronLeft, ChevronRight, Filter, Clock } from 'lucide-react';
 import { getPermits, type Permit } from '@/lib/supabase';
+import { useProjectRoles } from '@/lib/useProjectRoles';
+import { useActiveProject } from '@/lib/activeProject';
 import { useRouter } from '@/lib/router';
+import { useAuth } from '@/lib/auth';
+import { api, type Project } from '@/lib/api';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { StatusBadge, EmptyState } from '@/components/ui';
+import { StatusBadge, CategoryBadge, EmptyState } from '@/components/ui';
 
 const PAGE_SIZE = 8;
 
-export function PermitManagementPage() {
+export function PermitManagementPage({ filter = 'all' }: { filter?: 'all' | 'waiting' }) {
   const { navigate } = useRouter();
+  const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | Permit['status']>('all');
   const [page, setPage] = useState(1);
 
-  const permits = getPermits();
+  const isWaiting = filter === 'waiting';
+  // Members work inside their chosen project; admins see everything and can
+  // narrow by project via a filter dropdown.
+  const { activeProject, isMember } = useActiveProject();
+  const [adminProjects, setAdminProjects] = useState<Project[]>([]);
+  const [projectFilter, setProjectFilter] = useState('');
+
+  useEffect(() => {
+    if (isMember) return;
+    api.listProjects().then((res) => setAdminProjects(res.projects)).catch(() => {});
+  }, [isMember]);
+
+  const scopedProjectId = isMember ? activeProject?.id : projectFilter || undefined;
+  const permits = getPermits(scopedProjectId);
+  // Role the user holds *within each project* — the approval pipeline resolves
+  // each permit against this, since a user can be a different role per project.
+  const projectRoles = useProjectRoles(user?.id);
 
   const filtered = useMemo(() => {
     return permits.filter((p) => {
+      // Waiting Approval = pending and the permit is at the role the user
+      // holds in THAT permit's project.
+      if (isWaiting) {
+        const projectRole = isMember
+          ? activeProject?.roleCode
+          : p.project_id
+            ? projectRoles.get(p.project_id)
+            : undefined;
+        return p.status === 'pending' && p.current_approver_role === projectRole;
+      }
       const q = search.toLowerCase();
       const matchesSearch =
         !q ||
@@ -28,7 +59,7 @@ export function PermitManagementPage() {
       const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
-  }, [permits, search, statusFilter]);
+  }, [permits, search, statusFilter, isWaiting, projectRoles, isMember, activeProject?.roleCode]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -43,12 +74,20 @@ export function PermitManagementPage() {
         {/* Header */}
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-xl font-extrabold tracking-tight text-gray-900 dark:text-white">Permit Management</h1>
-            <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">Manage and track all permit applications</p>
+            <h1 className="text-xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+              {isWaiting ? 'Waiting Approval' : 'Permit Management'}
+            </h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+              {isWaiting
+                ? 'Permit menunggu approval role Anda'
+                : 'Manage and track all permit applications'}
+            </p>
           </div>
-          <button onClick={() => navigate('/dashboard/permits/new')} className="btn-primary">
-            <Plus className="h-4 w-4" /> Add Permit Baru
-          </button>
+          {!isWaiting && (
+            <button onClick={() => navigate('/dashboard/permits/new')} className="btn-primary">
+              <Plus className="h-4 w-4" /> Add Permit Baru
+            </button>
+          )}
         </div>
 
         {/* Toolbar */}
@@ -65,21 +104,41 @@ export function PermitManagementPage() {
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               />
             </div>
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-gray-400 dark:text-slate-500" />
-              {(['all', 'pending', 'approved', 'rejected'] as const).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => { setStatusFilter(s); setPage(1); }}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium capitalize transition-all
-                    ${statusFilter === s
-                      ? 'bg-brand-600 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'}`}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
+            {isWaiting ? (
+              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400">
+                <Clock className="h-4 w-4" />
+                Menunggu tindakan Anda
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                {!isMember && adminProjects.length > 0 && (
+                  <select
+                    value={projectFilter}
+                    onChange={(e) => { setProjectFilter(e.target.value); setPage(1); }}
+                    className="input-field !w-auto !py-1.5 text-xs"
+                    aria-label="Filter project"
+                  >
+                    <option value="">Semua Project</option>
+                    {adminProjects.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                )}
+                <Filter className="h-4 w-4 text-gray-400 dark:text-slate-500" />
+                {(['all', 'pending', 'approved', 'rejected'] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => { setStatusFilter(s); setPage(1); }}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium capitalize transition-all
+                      ${statusFilter === s
+                        ? 'bg-brand-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'}`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -102,6 +161,7 @@ export function PermitManagementPage() {
                     <th className="px-5 py-3 font-semibold">Tanggal Pengajuan</th>
                     <th className="px-5 py-3 font-semibold">User</th>
                     <th className="px-5 py-3 font-semibold">Project</th>
+                    <th className="px-5 py-3 font-semibold">Kategori</th>
                     <th className="px-5 py-3 font-semibold">Nama Kontraktor</th>
                     <th className="px-5 py-3 font-semibold">Status</th>
                     <th className="px-5 py-3 text-right font-semibold">Action</th>
@@ -128,6 +188,13 @@ export function PermitManagementPage() {
                         <td className="px-5 py-3.5 max-w-[180px]">
                           <span className="block truncate font-medium text-gray-900 dark:text-white">{p.project}</span>
                           <span className="block truncate text-xs text-gray-400 dark:text-slate-500">{p.department}</span>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          {p.category_name && p.category_color ? (
+                            <CategoryBadge name={p.category_name} color={p.category_color} />
+                          ) : (
+                            <span className="text-xs text-gray-400 dark:text-slate-500">—</span>
+                          )}
                         </td>
                         <td className="px-5 py-3.5 text-gray-700 dark:text-slate-300">{p.contractor_name}</td>
                         <td className="px-5 py-3.5"><StatusBadge status={p.status} /></td>

@@ -9,7 +9,7 @@
     @apply border-gray-200 dark:border-slate-700;
   }
   body {
-    @apply bg-gray-50 text-gray-900 antialiased dark:bg-slate-900 dark:text-slate-100;
+    @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-900 dark:text-slate-100;
     font-feature-settings: 'cv11', 'ss01';
   }
 }
@@ -17,14 +17,14 @@
 @layer components {
   .input-field {
     @apply w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-all
-      focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10
+      focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15
       dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500
-      dark:focus:border-brand-400 dark:focus:ring-brand-400/10;
+      dark:focus:border-brand-400 dark:focus:ring-brand-400/15;
   }
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white
-      transition-all hover:bg-brand-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60
-      dark:bg-brand-500 dark:hover:bg-brand-600;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white
+      transition-all hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60
+      dark:bg-blue-500 dark:hover:bg-blue-600;
   }
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-600

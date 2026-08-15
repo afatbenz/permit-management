@@ -5,14 +5,43 @@ import { useRouter } from '@/lib/router';
 import { Field } from '@/components/Field';
 import { Spinner } from '@/components/ui';
 
+/** Digits-only; first 2 chars are forced to "62". */
+function normalizePhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (digits === '') return '62';
+  // "08..." → "628...", already "62..." stays; strip a stray leading 0.
+  const withoutZero = digits.replace(/^0+/, '');
+  const prefixed = withoutZero.startsWith('62') ? withoutZero : `62${withoutZero}`;
+  return prefixed.slice(0, 15);
+}
+
+function passwordStrength(pw: string): { score: number; label: string; segments: boolean[] } {
+  const checks = [
+    pw.length >= 6,
+    /[A-Z]/.test(pw),
+    /[a-z]/.test(pw),
+    /\d/.test(pw),
+    /^\S+$/.test(pw),
+  ];
+  const score = checks.filter(Boolean).length;
+  const label = score === 0 ? 'Sangat lemah' : score <= 2 ? 'Lemah' : score <= 3 ? 'Cukup' : score === 4 ? 'Kuat' : 'Sangat kuat';
+  // 4 visual segments for the bar.
+  const segments = [score >= 1, score >= 2, score >= 3, score >= 4];
+  return { score, label, segments };
+}
+
+const PASSWORD_RULE_MSG =
+  'Password minimal 6 karakter, kombinasi huruf besar, huruf kecil, dan angka (tanpa spasi)';
+
 export function RegisterPage() {
   const { signUp } = useAuth();
   const { navigate } = useRouter();
   const [form, setForm] = useState({
     name: '',
     email: '',
-    phone: '',
+    phone: '62',
     password: '',
+    confirmPassword: '',
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -20,17 +49,34 @@ export function RegisterPage() {
 
   const set = (key: keyof typeof form, value: string) => setForm((p) => ({ ...p, [key]: value }));
 
+  const strength = passwordStrength(form.password);
+  const validPhone = /^62\d{8,}$/.test(form.phone);
+  const validPassword =
+    form.password.length >= 6 &&
+    /[A-Z]/.test(form.password) &&
+    /[a-z]/.test(form.password) &&
+    /\d/.test(form.password) &&
+    /^\S+$/.test(form.password);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccessMessage('');
 
-    if (!form.name || !form.email || !form.phone || !form.password) {
-      setError('Semua field wajib diisi.');
+    if (!form.name || !form.email) {
+      setError('Nama dan email wajib diisi.');
       return;
     }
-    if (form.password.length < 8) {
-      setError('Password minimal 8 karakter.');
+    if (!validPhone) {
+      setError('No. telepon minimal 10 digit setelah kode 62.');
+      return;
+    }
+    if (!validPassword) {
+      setError(PASSWORD_RULE_MSG);
+      return;
+    }
+    if (form.password !== form.confirmPassword) {
+      setError('Konfirmasi password tidak sama.');
       return;
     }
 
@@ -38,7 +84,7 @@ export function RegisterPage() {
     try {
       await signUp(form);
       setSuccessMessage('Akun berhasil dibuat! Silakan login untuk melanjutkan ke Create/Join Organization.');
-      setForm({ name: '', email: '', phone: '', password: '' });
+      setForm({ name: '', email: '', phone: '62', password: '', confirmPassword: '' });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Pendaftaran gagal. Silakan coba lagi.');
     } finally {
@@ -81,8 +127,67 @@ export function RegisterPage() {
 
             <Field id="name" label="Nama Lengkap" value={form.name} onChange={(v) => set('name', v)} placeholder="e.g. Samuel Sinaga" required />
             <Field id="email" label="Email" type="email" value={form.email} onChange={(v) => set('email', v)} placeholder="nama@perusahaan.com" required />
-            <Field id="phone" label="No. Telepon" type="tel" value={form.phone} onChange={(v) => set('phone', v)} placeholder="08xxxxxxxxxx" required />
-            <Field id="password" label="Password" type="password" value={form.password} onChange={(v) => set('password', v)} placeholder="Minimal 8 karakter" required />
+            <Field
+              id="phone"
+              label="No. Telepon"
+              type="tel"
+              value={form.phone}
+              onChange={(v) => set('phone', normalizePhone(v))}
+              placeholder="628xxxxxxxxxx"
+              required
+            />
+            <Field
+              id="password"
+              label="Password"
+              type="password"
+              value={form.password}
+              onChange={(v) => set('password', v)}
+              placeholder="Minimal 6 karakter"
+              required
+            />
+
+            {/* Password-strength progress bar */}
+            {form.password && (
+              <div>
+                <div className="flex gap-1.5">
+                  {strength.segments.map((on, i) => (
+                    <div
+                      key={i}
+                      className={`h-1.5 flex-1 rounded-full transition-colors ${
+                        on
+                          ? strength.score <= 2
+                            ? 'bg-rose-500'
+                            : strength.score === 3
+                              ? 'bg-amber-500'
+                              : 'bg-emerald-500'
+                          : 'bg-gray-200 dark:bg-slate-700'
+                      }`}
+                    />
+                  ))}
+                </div>
+                <p
+                  className={`mt-1.5 text-xs font-medium ${
+                    strength.score <= 2
+                      ? 'text-rose-600 dark:text-rose-400'
+                      : strength.score === 3
+                        ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-emerald-600 dark:text-emerald-400'
+                  }`}
+                >
+                  {strength.label}
+                </p>
+              </div>
+            )}
+
+            <Field
+              id="confirmPassword"
+              label="Konfirmasi Password"
+              type="password"
+              value={form.confirmPassword}
+              onChange={(v) => set('confirmPassword', v)}
+              placeholder="Ulangi password"
+              required
+            />
 
             <button type="submit" disabled={submitting} className="btn-primary w-full justify-center">
               {submitting ? <Spinner className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
