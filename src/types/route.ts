@@ -1,12 +1,17 @@
 import { type ComponentType, type LazyExoticComponent } from 'react';
 
-// Sesuaikan role dengan domain ePTW
+// Role codes mirror the backend `RoleCode` enum (epermit-backend). The guard
+// compares against `user.role.code` from the API, so the enum values MUST be
+// the exact backend codes.
 export enum ENUM_ROLE_AUTH {
-  SUPER_ADMIN = 'SUPER_ADMIN',
-  SAFETY_OFFICER = 'SAFETY_OFFICER',
-  ISSUER = 'ISSUER',
-  EXECUTOR = 'EXECUTOR',
-  UNASSIGNED = 'unassigned'
+  SUPER_ADMIN = 'super_admin',
+  ORG_ADMIN = 'org_admin',
+  SUPERVISOR_SUBCON = 'supervisor_subcon',
+  SUPERVISOR_MAINCON = 'supervisor_maincon',
+  HSE_MAINCON = 'hse_maincon',
+  CM_MAINCON = 'cm_maincon',
+  PROJECT_ADMIN = 'project_admin',
+  UNASSIGNED = 'unassigned',
 }
 
 export type TAppRoute = {

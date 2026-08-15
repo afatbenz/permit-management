@@ -1,0 +1,799 @@
+// ── HTTP client for the E-Permit backend ──────────────────────────────
+// Backend response envelopes (see TransformInterceptor / HttpExceptionFilter):
+//   Success: { success: true,  data }
+//   Error:   { success: false, statusCode, message }
+// The success envelope is stripped here — callers get `data` directly.
+//
+// Tokens live in module scope and are managed by auth.tsx via the setter
+// below, so the API layer attaches the Authorization header without a
+// circular import.
+
+export class ApiError extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+/** Role codes mirror the backend `RoleCode` enum. */
+export type RoleCode =
+  | 'super_admin'
+  | 'org_admin'
+  | 'supervisor_subcon'
+  | 'supervisor_maincon'
+  | 'hse_maincon'
+  | 'cm_maincon'
+  | 'project_admin'
+  | 'unassigned';
+
+export type AuthRole = { id: string; code: RoleCode; name: string };
+
+export type SessionUser = {
+  id: string;
+  organizationId: string;
+  roleId: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  role: AuthRole;
+};
+
+export type LoginResponse = {
+  accessToken: string;
+  refreshToken: string;
+  user: SessionUser;
+};
+
+export type RegisterPayload = {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  phone: string;
+};
+
+export type RegisterResponse = {
+  message: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string | null;
+  };
+};
+
+export type CreateOrganizationPayload = {
+  organizationName: string;
+  address?: string;
+  city: string;
+  province: string;
+};
+
+export type CreateOrganizationResponse = {
+  organization: { id: string; name: string; code: string };
+  defaultProject: { id: string; projectCode: string; name: string };
+  invitationCode: string;
+  promoted: boolean;
+};
+
+export type JoinOrganizationPayload = {
+  invitationCode: string;
+};
+
+export type JoinOrganizationResponse = {
+  message: string;
+  project: { id: string; name: string; projectCode: string };
+  status: 'pending';
+};
+
+// ---- Location reference data (public) ----
+
+export type Province = { id: string; name: string };
+export type City = { id: string; name: string; province: string | null; provinceId: string };
+export type ListProvincesResponse = { provinces: Province[] };
+export type ListCitiesResponse = { cities: City[] };
+
+// ---- Projects ----
+
+export type Project = {
+  id: string;
+  organizationId: string;
+  projectCode: string;
+  name: string;
+  projectAdminId: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  /** Active invitation code for the project (listProjects only). */
+  invitationCode?: string | null;
+  /** Role the signed-in user holds within this project (listMyProjects only). */
+  roleId?: string | null;
+  roleCode?: RoleCode | null;
+  roleName?: string | null;
+};
+
+export type CreateProjectResponse = {
+  project: Project;
+  invitationCode: string;
+};
+
+export type OrgProjectWithMembers = {
+  id: string;
+  name: string;
+  projectCode: string;
+  projectAdminId: string | null;
+  members: Array<{
+    userId: string;
+    name: string | null;
+    email: string | null;
+    roleId: string | null;
+    roleCode: RoleCode | null;
+    roleName: string | null;
+  }>;
+};
+
+export type InvitationCode = {
+  id: string;
+  projectId: string;
+  projectName: string | null;
+  code: string;
+  status: string;
+  createdAt: string;
+};
+
+// ---- Permit categories ----
+
+export type PermitCategory = {
+  id: string;
+  name: string;
+  color: string;
+  sortOrder: number;
+  scope: 'system' | 'organization' | 'project';
+  isDefault: boolean;
+  removable: boolean;
+};
+
+// ---- Bank questions (checklist per permit category) ----
+
+export type BankQuestion = {
+  id: string;
+  categoryId: string;
+  categoryName: string | null;
+  categoryColor: string | null;
+  questionEn: string;
+  questionId: string;
+  sortOrder: number;
+  canMutate: boolean;
+};
+
+export type BankQuestionInput = {
+  categoryId: string;
+  questionEn: string;
+  questionId: string;
+  sortOrder?: number;
+};
+
+// ---- Permits ----
+
+export type PermitStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
+
+export type Permit = {
+  id: string;
+  organizationId: string;
+  projectId: string;
+  permitNumber: string;
+  workTitle: string;
+  department: string;
+  contractorName: string;
+  location1: string;
+  location2: string | null;
+  city: string;
+  province: string;
+  startAt: string | null;
+  endAt: string | null;
+  workDesc: string | null;
+  status: PermitStatus;
+  submittedAt: string | null;
+  approvedAt: string | null;
+  rejectedAt: string | null;
+  approvedBy: string | null;
+  rejectedBy: string | null;
+  rejectionReason: string | null;
+  createdBy: string | null;
+  updatedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** Joined from the project (list only). */
+  projectName?: string | null;
+  projectCode?: string | null;
+};
+
+export type CreatePermitInput = {
+  projectId: string;
+  workTitle: string;
+  department: string;
+  contractorName: string;
+  location1: string;
+  location2?: string;
+  city: string;
+  province: string;
+  startAt?: string;
+  endAt?: string;
+  workDesc?: string;
+};
+
+export type UpdatePermitInput = Partial<Omit<CreatePermitInput, 'projectId'>>;
+
+// ---- Org settings ----
+
+export type UpdateOrganizationSettingsPayload = {
+  name?: string;
+  address?: string;
+  city?: string;
+  province?: string;
+};
+
+// ---- Member join-by-code requests ----
+
+export type MemberRequest = {
+  id: string;
+  projectId: string;
+  projectName: string | null;
+  userId: string;
+  userName: string | null;
+  userEmail: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+};
+
+export type Notification = {
+  id: string;
+  organizationId: string;
+  recipientId: string;
+  type: string;
+  title: string;
+  message: string | null;
+  data: Record<string, unknown> | null;
+  isRead: boolean;
+  createdAt: string;
+  createdBy: string | null;
+};
+
+// ---- User management (Org Admin) ----
+
+export type AdminUser = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  roleId: string;
+  roleCode: RoleCode | null;
+  roleName: string | null;
+  verificationStatus: string;
+  status: string;
+  createdAt: string;
+  /** The user's project assignments (each carries its per-project role). */
+  assignments: Array<{
+    projectId: string;
+    projectName: string | null;
+    roleId: string;
+    roleCode: RoleCode | null;
+    roleName: string | null;
+    status: string;
+  }>;
+};
+
+export type AssignableRole = {
+  id: string;
+  code: RoleCode;
+  name: string;
+};
+
+export type ListUsersResponse = {
+  users: AdminUser[];
+};
+
+export type ResolvedRegistrationLink = {
+  organization: { id: string; name: string } | null;
+  subconCompanies: Array<{ id: string; name: string }>;
+};
+
+// ---- Profile + signature ----
+
+export type ProfilePayload = {
+  name?: string;
+  email?: string;
+  phone?: string;
+  jobTitle?: string;
+  /** Base64 data URL from canvas.toDataURL() — the manual draw path. */
+  signature?: string;
+};
+
+export type ProfileResponse = {
+  user: SessionUser | null;
+  signatureUrl: string | null;
+  profile: { jobTitle: string | null; defaultSignatureUrl: string | null } | null;
+};
+
+export type EvidenceType = 'SITE_MAP' | 'EQUIPMENT' | 'OTHER';
+
+export type EvidenceItem = {
+  id: string;
+  permitId: string;
+  evidenceType: EvidenceType;
+  mimeType: string;
+  sizeBytes: number;
+  uploadedBy: string;
+  url: string;
+  createdAt: string;
+};
+
+// ---- Base URL -----------------------------------------------------------
+function getBaseUrl(): string {
+  const raw = (import.meta.env.VITE_API_TARGET as string | undefined) ?? '';
+  if (!raw) return '';
+  return raw.endsWith('/') ? raw.slice(0, -1) : raw;
+}
+
+// ---- Token plumbing -----------------------------------------------------
+// The single source of truth for the access token is the zustand client
+// store (persisted to localStorage, refreshed by the axios interceptor).
+// `auth.tsx` mirrors the value so this layer can read it without a circular
+// import.
+
+import { useClientStore } from '@/stores/Client';
+/** auth.tsx binds the live access token; called on every request. */
+export function setAccessTokenGetter(getter: () => string | null): void {
+  // no-op: token comes from the store. Kept for signature compatibility.
+}
+
+function currentAccessToken(): string | null {
+  const token = useClientStore.getState().accessToken;
+  return typeof token === 'string' && token ? token : null;
+}
+
+// ---- 401 → silent refresh ---------------------------------------------
+// Single-flight: concurrent 401s trigger one refresh, then retry in flight.
+let refreshing: Promise<boolean> | null = null;
+let refreshHandler: (() => Promise<boolean>) | null = null;
+
+/** auth.tsx mounts its refresh routine so this layer stays token-agnostic. */
+export function setRefreshHandler(handler: (() => Promise<boolean>) | null): void {
+  refreshHandler = handler;
+}
+
+type SuccessEnvelope<T> = { success: true; data: T };
+type ErrorEnvelope = { success: false; statusCode: number; message: string | string[] };
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const isFormData = init.body instanceof FormData;
+
+  const headers: Record<string, string> = {
+    // For multipart/form-data, let the browser set the boundary — do NOT set
+    // Content-Type manually, otherwise the server rejects the upload.
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+    ...(init.headers as Record<string, string> | undefined),
+  };
+
+  const attachToken = (target: Record<string, string>) => {
+    const token = currentAccessToken();
+    if (token) target.Authorization = `Bearer ${token}`;
+  };
+  attachToken(headers);
+
+  const url = `${getBaseUrl()}${path}`;
+  let res = await fetch(url, { ...init, headers });
+
+  // On 401, attempt one silent refresh, then retry the request.
+  if (res.status === 401 && refreshHandler && !refreshing) {
+    refreshing = refreshHandler().finally(() => {
+      refreshing = null;
+    });
+    const ok = await refreshing;
+    if (ok) {
+      const retryHeaders = { ...headers };
+      attachToken(retryHeaders);
+      res = await fetch(url, { ...init, headers: retryHeaders });
+    }
+  }
+
+  const body = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    const envelope = body as ErrorEnvelope | null;
+    const message = Array.isArray(envelope?.message)
+      ? envelope!.message.join(', ')
+      : envelope?.message ?? `Request failed (${res.status})`;
+    throw new ApiError(message, res.status);
+  }
+
+  const success = body as SuccessEnvelope<T>;
+  return success.data;
+}
+
+/** Fetches a binary asset (image bytes) with the auth header attached. */
+export async function fetchBlob(path: string): Promise<Blob> {
+  const token = currentAccessToken();
+  const url = `${getBaseUrl()}${path}`;
+  const res = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (!res.ok) {
+    throw new ApiError(`Gagal memuat file (${res.status})`, res.status);
+  }
+  return res.blob();
+}
+
+// ---- Auth endpoints ----------------------------------------------------
+export const api = {
+  async login(email: string, password: string): Promise<LoginResponse> {
+    return request<LoginResponse>('/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  },
+
+  async refresh(refreshToken: string): Promise<LoginResponse> {
+    return request<LoginResponse>('/api/v1/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ refreshToken }),
+    });
+  },
+
+  async logout(refreshToken: string): Promise<void> {
+    // Best-effort: the client clears its local session regardless.
+    try {
+      await request<{ message: string }>('/api/v1/auth/logout', {
+        method: 'POST',
+        body: JSON.stringify({ refreshToken }),
+      });
+    } catch {
+      /* ignore */
+    }
+  },
+
+  async register(payload: RegisterPayload): Promise<RegisterResponse> {
+    return request<RegisterResponse>('/api/v1/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async createOrganization(payload: CreateOrganizationPayload): Promise<CreateOrganizationResponse> {
+    return request<CreateOrganizationResponse>('/api/v1/organizations', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async joinOrganizationByCode(payload: JoinOrganizationPayload): Promise<JoinOrganizationResponse> {
+    return request<JoinOrganizationResponse>('/api/v1/organizations/join-code', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // ---- Location reference data ----
+
+  async listProvinces(): Promise<ListProvincesResponse> {
+    return request<ListProvincesResponse>('/api/v1/locations/provinces');
+  },
+
+  async listCities(provinceId?: string): Promise<ListCitiesResponse> {
+    const q = provinceId ? `?provinceId=${encodeURIComponent(provinceId)}` : '';
+    return request<ListCitiesResponse>(`/api/v1/locations/cities${q}`);
+  },
+
+  // ---- Projects ----
+
+  async listProjects(): Promise<{ projects: Project[] }> {
+    return request<{ projects: Project[] }>('/api/v1/projects');
+  },
+
+  /** Projects the signed-in user is actively assigned to (any role). */
+  async listMyProjects(): Promise<{ projects: Project[] }> {
+    return request<{ projects: Project[] }>('/api/v1/projects/mine');
+  },
+
+  async createProject(payload: { name: string; projectCode: string }): Promise<CreateProjectResponse> {
+    return request<CreateProjectResponse>('/api/v1/projects', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getProject(projectId: string): Promise<{ project: Project }> {
+    return request<{ project: Project }>(`/api/v1/projects/${projectId}`);
+  },
+
+  async deleteProject(projectId: string): Promise<{ message: string; projectId: string }> {
+    return request<{ message: string; projectId: string }>(`/api/v1/projects/${projectId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // ---- Org settings ----
+
+  async getInvitationCodes(organizationId: string): Promise<{ codes: InvitationCode[] }> {
+    return request<{ codes: InvitationCode[] }>(
+      `/api/v1/organizations/${organizationId}/invitation-codes`,
+    );
+  },
+
+  async getOrganizationSettings(organizationId: string): Promise<{
+    organization: { id: string; name: string; address: string | null; city: string | null; province: string | null };
+  }> {
+    return request(`/api/v1/organizations/${organizationId}/settings`);
+  },
+
+  async updateOrganizationSettings(
+    organizationId: string,
+    payload: UpdateOrganizationSettingsPayload,
+  ): Promise<{ organization: { id: string; name: string; address: string | null; city: string | null; province: string | null } }> {
+    return request(`/api/v1/organizations/${organizationId}/settings`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // ---- Member join-by-code requests ----
+
+  async listOrgProjects(organizationId: string): Promise<{ projects: OrgProjectWithMembers[] }> {
+    return request<{ projects: OrgProjectWithMembers[] }>(
+      `/api/v1/organizations/${organizationId}/projects`,
+    );
+  },
+
+  async listMemberRequests(
+    organizationId: string,
+  ): Promise<{ requests: MemberRequest[] }> {
+    return request<{ requests: MemberRequest[] }>(
+      `/api/v1/organizations/${organizationId}/member-requests`,
+    );
+  },
+
+  async approveMemberRequest(organizationId: string, requestId: string): Promise<{ message: string }> {
+    return request<{ message: string }>(
+      `/api/v1/organizations/${organizationId}/member-requests/${requestId}/approve`,
+      { method: 'POST' },
+    );
+  },
+
+  async rejectMemberRequest(organizationId: string, requestId: string): Promise<{ message: string }> {
+    return request<{ message: string }>(
+      `/api/v1/organizations/${organizationId}/member-requests/${requestId}/reject`,
+      { method: 'POST' },
+    );
+  },
+
+  // ---- Notifications ----
+
+  async listNotifications(): Promise<{ notifications: Notification[]; unreadCount: number }> {
+    return request<{ notifications: Notification[]; unreadCount: number }>('/api/v1/notifications');
+  },
+
+  async markNotificationRead(id: string): Promise<{ message: string; id: string }> {
+    return request<{ message: string; id: string }>(`/api/v1/notifications/${id}/read`, {
+      method: 'PATCH',
+    });
+  },
+
+  async resolveRegistrationLink(token: string): Promise<ResolvedRegistrationLink> {
+    return request<ResolvedRegistrationLink>(
+      `/api/v1/auth/registration-links/${encodeURIComponent(token)}`,
+    );
+  },
+
+  async listUsers(organizationId: string): Promise<ListUsersResponse> {
+    return request<ListUsersResponse>(`/api/v1/organizations/${organizationId}/users`);
+  },
+
+  async listAssignableRoles(): Promise<{ roles: AssignableRole[] }> {
+    return request<{ roles: AssignableRole[] }>('/api/v1/organizations/roles');
+  },
+
+  /** Project assignment with a per-project role. */
+  async updateUserRole(
+    organizationId: string,
+    userId: string,
+    payload:
+      | { roleId: string; assignments?: Array<{ projectId: string; roleId: string }> }
+      | { roleId: string; projectId?: string },
+  ): Promise<{ message: string }> {
+    return request<{ message: string }>(`/api/v1/organizations/${organizationId}/users/${userId}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /** project_admin / org_admin set a user's role inside a specific project. */
+  async updateProjectUserRole(
+    projectId: string,
+    userId: string,
+    roleId: string,
+  ): Promise<{ message: string }> {
+    return request<{ message: string }>(
+      `/api/v1/organizations/projects/${projectId}/users/${userId}/role`,
+      { method: 'PATCH', body: JSON.stringify({ roleId }) },
+    );
+  },
+
+  // ---- Profile / signature ----
+
+  async getProfile(): Promise<ProfileResponse> {
+    return request<ProfileResponse>('/api/v1/profile');
+  },
+
+  /** JSON path: profile fields + base64 `signature` (canvas draw). */
+  async updateProfileJson(payload: ProfilePayload): Promise<ProfileResponse> {
+    return request<ProfileResponse>('/api/v1/profile', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /** Multipart path: profile fields + `file` (file picker). */
+  async updateProfileMultipart(
+    payload: ProfilePayload,
+    file: File,
+  ): Promise<ProfileResponse> {
+    const fd = new FormData();
+    if (payload.name) fd.append('name', payload.name);
+    if (payload.email) fd.append('email', payload.email);
+    if (payload.phone) fd.append('phone', payload.phone);
+    if (payload.jobTitle) fd.append('jobTitle', payload.jobTitle);
+    fd.append('file', file);
+    return request<ProfileResponse>('/api/v1/profile', { method: 'PUT', body: fd });
+  },
+
+  // ---- Permit evidence ----
+
+  /**
+   * Uploads multiple evidence files for a permit.
+   * `files` aligned by index with `types` (e.g. SITE_MAP, EQUIPMENT).
+   */
+  async uploadEvidences(
+    permitId: string,
+    files: File[],
+    types: EvidenceType[],
+  ): Promise<{ message: string; evidences: EvidenceItem[] }> {
+    const fd = new FormData();
+    for (const f of files) fd.append('files', f);
+    const typesParam = encodeURIComponent(JSON.stringify(types));
+    return request<{ message: string; evidences: EvidenceItem[] }>(
+      `/api/v1/permits/${permitId}/evidences?types=${typesParam}`,
+      { method: 'POST', body: fd },
+    );
+  },
+
+  async listEvidences(
+    permitId: string,
+    evidenceType?: EvidenceType,
+  ): Promise<{ evidences: EvidenceItem[] }> {
+    const q = evidenceType ? `?evidenceType=${evidenceType}` : '';
+    return request<{ evidences: EvidenceItem[] }>(`/api/v1/permits/${permitId}/evidences${q}`);
+  },
+
+  // ---- Permits ----
+
+  async listPermits(projectId?: string): Promise<{ permits: Permit[] }> {
+    const q = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+    return request<{ permits: Permit[] }>(`/api/v1/permits${q}`);
+  },
+
+  async getPermit(permitId: string): Promise<{ permit: Permit }> {
+    return request<{ permit: Permit }>(`/api/v1/permits/${permitId}`);
+  },
+
+  async createPermit(payload: CreatePermitInput): Promise<{ permit: Permit }> {
+    return request<{ permit: Permit }>('/api/v1/permits', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updatePermit(
+    permitId: string,
+    payload: UpdatePermitInput,
+  ): Promise<{ permit: Permit }> {
+    return request<{ permit: Permit }>(`/api/v1/permits/${permitId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updatePermitStatus(
+    permitId: string,
+    status: PermitStatus,
+    rejectionReason?: string,
+  ): Promise<{ permit: Permit }> {
+    return request<{ permit: Permit }>(`/api/v1/permits/${permitId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify(
+        rejectionReason ? { status, rejectionReason } : { status },
+      ),
+    });
+  },
+
+  async deletePermit(permitId: string): Promise<{ message: string; permitId: string }> {
+    return request<{ message: string; permitId: string }>(`/api/v1/permits/${permitId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // ---- Permit categories ----
+
+  async listProjectCategories(projectId: string): Promise<{ categories: PermitCategory[] }> {
+    return request<{ categories: PermitCategory[] }>(`/api/v1/projects/${projectId}/categories`);
+  },
+
+  async createProjectCategory(
+    projectId: string,
+    payload: { name: string; color: string },
+  ): Promise<{ category: PermitCategory }> {
+    return request<{ category: PermitCategory }>(`/api/v1/projects/${projectId}/categories`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateProjectCategoryColor(
+    projectId: string,
+    categoryId: string,
+    color: string,
+  ): Promise<{ category: PermitCategory }> {
+    return request<{ category: PermitCategory }>(
+      `/api/v1/projects/${projectId}/categories/${categoryId}`,
+      { method: 'PATCH', body: JSON.stringify({ color }) },
+    );
+  },
+
+  async removeProjectCategory(projectId: string, categoryId: string): Promise<{ message: string }> {
+    return request<{ message: string }>(
+      `/api/v1/projects/${projectId}/categories/${categoryId}`,
+      { method: 'DELETE' },
+    );
+  },
+
+  // ---- Bank questions (checklist per permit category) ----
+
+  async listBankQuestions(projectId: string): Promise<{
+    projectId: string;
+    questions: BankQuestion[];
+  }> {
+    return request(`/api/v1/projects/${projectId}/bank-questions`);
+  },
+
+  async createBankQuestion(
+    projectId: string,
+    payload: BankQuestionInput,
+  ): Promise<{ question: BankQuestion }> {
+    return request<{ question: BankQuestion }>(
+      `/api/v1/projects/${projectId}/bank-questions`,
+      { method: 'POST', body: JSON.stringify(payload) },
+    );
+  },
+
+  async updateBankQuestion(
+    projectId: string,
+    questionId: string,
+    payload: Partial<BankQuestionInput>,
+  ): Promise<{ question: BankQuestion }> {
+    return request<{ question: BankQuestion }>(
+      `/api/v1/projects/${projectId}/bank-questions/${questionId}`,
+      { method: 'PATCH', body: JSON.stringify(payload) },
+    );
+  },
+
+  async removeBankQuestion(
+    projectId: string,
+    questionId: string,
+  ): Promise<{ message: string; questionId: string }> {
+    return request<{ message: string; questionId: string }>(
+      `/api/v1/projects/${projectId}/bank-questions/${questionId}`,
+      { method: 'DELETE' },
+    );
+  },
+};
