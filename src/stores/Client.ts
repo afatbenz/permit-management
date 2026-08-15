@@ -31,13 +31,13 @@ export const registerUser = async (data: RegisterFormInputs) => {
 };
 
 // 1. Perbaikan Interface (Sesuai dengan payload API sebenarnya)
-export interface Role {
+interface Role {
   id: string;
-  code: ENUM_ROLE_AUTH; // Nilai enum identik dengan RoleCode backend
+  code: string | ENUM_ROLE_AUTH; // Mendukung enum internal kita
   name: string;
 }
 
-export interface User {
+interface User {
   id: string;
   organizationId: string;
   subconCompanyId: string | null; // Harus bisa null

@@ -13,7 +13,7 @@ const Dashboard = lazy(() => import('@/pages/HomePage'))
 const RegisterPage = lazy(() => import('@/pages/RegisterPage'))
 const PermitManagementPage = lazy(() => import('@/pages/PermitManagementPage'));
 const NewPermitPage = lazy(() => import('@/pages/NewPermitPage'));
-const PermitDetailPage = lazy(() => import('@/pages/PermitDetailPage'));
+// const PermitDetailPage = lazy(() => import('@/pages/PermitDetailPage'));
 // const NotFound = lazy(() => import('@/pages/NotFound'));
 
 const routes: TAppRoute[] = [
@@ -39,18 +39,7 @@ const routes: TAppRoute[] = [
     isProtected: true,
     component: Dashboard,
     layout: DashboardLayout, // Gunakan DashboardLayout di sini
-    // Semua role terautentikasi — guard efektif-role per-project dikelola
-    // di layar dashboard (via activeProject), bukan di whitelist rute.
-    roles: [
-      ENUM_ROLE_AUTH.SUPER_ADMIN,
-      ENUM_ROLE_AUTH.ORG_ADMIN,
-      ENUM_ROLE_AUTH.SUPERVISOR_SUBCON,
-      ENUM_ROLE_AUTH.SUPERVISOR_MAINCON,
-      ENUM_ROLE_AUTH.HSE_MAINCON,
-      ENUM_ROLE_AUTH.CM_MAINCON,
-      ENUM_ROLE_AUTH.PROJECT_ADMIN,
-      ENUM_ROLE_AUTH.UNASSIGNED,
-    ],
+    roles: [ENUM_ROLE_AUTH.SUPER_ADMIN, ENUM_ROLE_AUTH.SAFETY_OFFICER, ENUM_ROLE_AUTH.ISSUER, ENUM_ROLE_AUTH.EXECUTOR, ENUM_ROLE_AUTH.UNASSIGNED]
   },
   {
     path: '/permit',
@@ -58,16 +47,7 @@ const routes: TAppRoute[] = [
     isProtected: true,
     component: PermitManagementPage,
     layout: DashboardLayout,
-    roles: [
-      ENUM_ROLE_AUTH.SUPER_ADMIN,
-      ENUM_ROLE_AUTH.ORG_ADMIN,
-      ENUM_ROLE_AUTH.SUPERVISOR_SUBCON,
-      ENUM_ROLE_AUTH.SUPERVISOR_MAINCON,
-      ENUM_ROLE_AUTH.HSE_MAINCON,
-      ENUM_ROLE_AUTH.CM_MAINCON,
-      ENUM_ROLE_AUTH.PROJECT_ADMIN,
-      ENUM_ROLE_AUTH.UNASSIGNED,
-    ],
+    roles: [ENUM_ROLE_AUTH.SUPER_ADMIN, ENUM_ROLE_AUTH.SAFETY_OFFICER, ENUM_ROLE_AUTH.ISSUER, ENUM_ROLE_AUTH.UNASSIGNED]
   },
   {
     path: '/permit/new',
@@ -75,34 +55,16 @@ const routes: TAppRoute[] = [
     isProtected: true,
     component: NewPermitPage,
     layout: DashboardLayout,
-    roles: [
-      ENUM_ROLE_AUTH.SUPER_ADMIN,
-      ENUM_ROLE_AUTH.ORG_ADMIN,
-      ENUM_ROLE_AUTH.SUPERVISOR_SUBCON,
-      ENUM_ROLE_AUTH.SUPERVISOR_MAINCON,
-      ENUM_ROLE_AUTH.HSE_MAINCON,
-      ENUM_ROLE_AUTH.CM_MAINCON,
-      ENUM_ROLE_AUTH.PROJECT_ADMIN,
-      ENUM_ROLE_AUTH.UNASSIGNED,
-    ],
+    roles: [ENUM_ROLE_AUTH.SUPER_ADMIN, ENUM_ROLE_AUTH.EXECUTOR, ENUM_ROLE_AUTH.ISSUER, ENUM_ROLE_AUTH.UNASSIGNED]
   },
-  {
-    path: '/permit/:id',
-    name: 'Permit Detail',
-    isProtected: true,
-    component: PermitDetailPage,
-    layout: DashboardLayout,
-    roles: [
-      ENUM_ROLE_AUTH.SUPER_ADMIN,
-      ENUM_ROLE_AUTH.ORG_ADMIN,
-      ENUM_ROLE_AUTH.SUPERVISOR_SUBCON,
-      ENUM_ROLE_AUTH.SUPERVISOR_MAINCON,
-      ENUM_ROLE_AUTH.HSE_MAINCON,
-      ENUM_ROLE_AUTH.CM_MAINCON,
-      ENUM_ROLE_AUTH.PROJECT_ADMIN,
-      ENUM_ROLE_AUTH.UNASSIGNED,
-    ],
-  },
+  // {
+  //   path: '/permit/:id',
+  //   name: 'Permit Detail',
+  //   isProtected: true,
+  //   component: PermitDetailPage,
+  //   layout: DashboardLayout,
+  //   roles: [ENUM_ROLE_AUTH.SUPER_ADMIN, ENUM_ROLE_AUTH.SAFETY_OFFICER, ENUM_ROLE_AUTH.ISSUER, ENUM_ROLE_AUTH.EXECUTOR]
+  // },
   // {
   //   path: '*',
   //   name: 'Notfound',

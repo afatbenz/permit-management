@@ -1,21 +1,17 @@
 import type { ReactNode } from 'react';
 
-export type BadgeStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
-
 type BadgeProps = {
-  status: BadgeStatus;
+  status: 'pending' | 'approved' | 'rejected';
 };
 
 const STYLES: Record<BadgeProps['status'], string> = {
-  draft: 'bg-gray-100 text-gray-700 ring-gray-500/20 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-600/40',
-  submitted: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-400/20',
+  pending: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-400/20',
   approved: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-400/20',
   rejected: 'bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-400/20',
 };
 
 const LABELS: Record<BadgeProps['status'], string> = {
-  draft: 'Draft',
-  submitted: 'Submitted',
+  pending: 'Pending',
   approved: 'Approved',
   rejected: 'Rejected',
 };

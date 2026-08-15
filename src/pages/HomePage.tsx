@@ -1,59 +1,34 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FileText, Clock, CheckCircle2, XCircle, TrendingUp, Plus, ArrowRight, PenLine } from 'lucide-react';
-import { api, type Permit } from '@/lib/api';
+import { FileText, Clock, CheckCircle2, XCircle, TrendingUp, Plus, ArrowRight } from 'lucide-react';
+import { getPermits, type Permit } from '@/lib/supabase'; // Asumsi mock data ini masih Anda gunakan
 import { useNavigate } from 'react-router-dom';
 import { useClientStore } from '@/stores/Client';
-import { StatusBadge, EmptyState, Spinner } from '@/components/ui';
-import { useActiveProject } from '@/lib/activeProject';
+import { StatusBadge, EmptyState } from '@/components/ui';
 
 const HomePage = () => {
+  // Gunakan standard hooks yang sudah kita bangun
   const { user } = useClientStore();
-  const { activeProject, isMember } = useActiveProject();
   const navigate = useNavigate();
-  const [permits, setPermits] = useState<Permit[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  const permits: Permit[] = getPermits().slice(0, 5);
 
-  const projectId = isMember ? activeProject?.id : undefined;
+  const stats = {
+    total: getPermits().length,
+    pending: getPermits().filter((p) => p.status === 'pending').length,
+    approved: getPermits().filter((p) => p.status === 'approved').length,
+    rejected: getPermits().filter((p) => p.status === 'rejected').length,
+  };
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await api.listPermits(projectId);
-      setPermits(res.permits);
-    } catch {
-      setPermits([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const recent = useMemo(() => permits.slice(0, 5), [permits]);
-
-  const stats = useMemo(
-    () => ({
-      total: permits.length,
-      draft: permits.filter((p) => p.status === 'draft').length,
-      submitted: permits.filter((p) => p.status === 'submitted').length,
-      approved: permits.filter((p) => p.status === 'approved').length,
-      rejected: permits.filter((p) => p.status === 'rejected').length,
-    }),
-    [permits],
-  );
-
+  // Sesuaikan dengan struktur data user dari API (Zustand)
   const firstName = user?.name ? user.name.split(' ')[0] : 'Guest';
 
   const STAT_CARDS = [
     { label: 'Total Permits', value: stats.total, icon: <FileText className="h-5 w-5" />, tint: 'text-brand-600 bg-brand-50 dark:bg-brand-500/10 dark:text-brand-400' },
-    { label: 'Draft', value: stats.draft, icon: <PenLine className="h-5 w-5" />, tint: 'text-gray-600 bg-gray-100 dark:bg-slate-800 dark:text-slate-300' },
-    { label: 'Submitted', value: stats.submitted, icon: <Clock className="h-5 w-5" />, tint: 'text-amber-600 bg-amber-50 dark:bg-amber-500/10 dark:text-amber-400' },
+    { label: 'Pending', value: stats.pending, icon: <Clock className="h-5 w-5" />, tint: 'text-amber-600 bg-amber-50 dark:bg-amber-500/10 dark:text-amber-400' },
     { label: 'Approved', value: stats.approved, icon: <CheckCircle2 className="h-5 w-5" />, tint: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400' },
     { label: 'Rejected', value: stats.rejected, icon: <XCircle className="h-5 w-5" />, tint: 'text-rose-600 bg-rose-50 dark:bg-rose-500/10 dark:text-rose-400' },
   ];
 
+  // LANGSUNG RETURN KONTEN, JANGAN BUNGKUS DENGAN <DashboardLayout>
   return (
     <div className="space-y-6">
       {/* Hero greeting */}
@@ -71,7 +46,7 @@ const HomePage = () => {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {STAT_CARDS.map((s) => (
           <div key={s.label} className="card p-5">
             <div className={`mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl ${s.tint}`}>{s.icon}</div>
@@ -93,11 +68,7 @@ const HomePage = () => {
           </button>
         </div>
 
-        {loading ? (
-          <div className="flex justify-center py-10">
-            <Spinner className="h-6 w-6 text-brand-600" />
-          </div>
-        ) : recent.length === 0 ? (
+        {permits.length === 0 ? (
           <EmptyState
             icon={<FileText className="h-6 w-6" />}
             title="No permits yet"
@@ -106,7 +77,7 @@ const HomePage = () => {
           />
         ) : (
           <div className="divide-y divide-gray-100 dark:divide-slate-800">
-            {recent.map((p) => (
+            {permits.map((p) => (
               <button
                 key={p.id}
                 onClick={() => navigate(`/permit/${p.id}`)}
@@ -116,8 +87,8 @@ const HomePage = () => {
                   <FileText className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{p.workTitle}</p>
-                  <p className="truncate text-xs text-gray-500 dark:text-slate-400">{p.permitNumber} · {p.contractorName}</p>
+                  <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{p.project}</p>
+                  <p className="truncate text-xs text-gray-500 dark:text-slate-400">{p.permit_number} · {p.contractor_name}</p>
                 </div>
                 <div className="hidden sm:block">
                   <StatusBadge status={p.status} />
@@ -138,6 +109,6 @@ const HomePage = () => {
       </div>
     </div>
   );
-};
+}
 
 export default HomePage;
